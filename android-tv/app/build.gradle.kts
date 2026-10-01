@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -9,11 +12,19 @@ plugins {
 // building an *unsigned* release if that file doesn't exist yet, so a
 // plain debug build still works with zero setup — signing only matters
 // once you're producing the build you'll upload to Play Console.
+//
+// Imported explicitly (java.io.FileInputStream / java.util.Properties)
+// rather than referenced inline as java.io.X / java.util.X — Gradle's
+// Kotlin DSL adds an implicit `java` extension property to every build
+// script (from the Android/Kotlin plugins), which shadows the `java`
+// top-level package name and breaks a fully-qualified java.util.Foo /
+// java.io.Foo reference ("Unresolved reference: util"/"io") even though
+// the exact same classes work fine when imported normally.
 val keystorePropertiesFile = rootProject.file("keystore.properties")
-val keystoreProperties = java.util.Properties()
+val keystoreProperties = Properties()
 val hasKeystoreProperties = keystorePropertiesFile.exists()
 if (hasKeystoreProperties) {
-    keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
 android {
