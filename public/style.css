@@ -1,0 +1,2267 @@
+/* Palette + type inspired by the "Abyss" Jellyfin theme
+   (https://github.com/AumGupta/abyss-jellyfin): a neutral near-black base
+   with frosted-glass elevated surfaces and a monochrome near-white accent
+   used purely as a FILL color — buttons, active pills/tabs, progress bars
+   — never as a text-highlight color. Anything painted solid `--accent`
+   pairs with `--accent-contrast` (near-black) text/icons on top of it, the
+   same way Abyss flips a pill to solid white with dark bold text on
+   hover/active rather than just recoloring text against the same
+   background. */
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&display=swap');
+
+:root {
+  --bg: #121212;
+  --bg-elevated: #2a2a2a;
+  --text: #eaeaf0;
+  --text-dim: #9a9ba8;
+  --accent: #f5f5f7;
+  --accent-rgb: 245, 245, 247;
+  --accent-contrast: #121212;
+  --glass-tint: 42, 42, 42;
+  --card-radius: 12px;
+  --radius-lg: 24px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-snappy: cubic-bezier(0.4, 0, 0.2, 1);
+  /* Kept in sync with .app-nav's real rendered height by a ResizeObserver
+     in app.js (it varies: the scan-progress bar toggling on/off, the
+     topbar wrapping to 2 lines on a narrow/portrait screen) — see .hero's
+     negative margin-top below for what this is for. 0px until JS runs is a
+     safe fallback: the hero just sits below the nav like before instead of
+     overlapping oddly. */
+  --nav-height: 0px;
+  /* The hero banner's rendered height. A single shared value (rather than
+     separate height/min-height/max-height on .hero) so .rows below can
+     compute its own offset and scroll-box height from the exact same
+     number — see .hero and .rows. Breakpoints further down override this
+     variable, not .hero's height directly, so the two stay in sync. */
+  --hero-height: clamp(420px, 56vh, 720px);
+  /* Multiplies every backdrop-filter blur radius below (each one reads
+     `blur(calc(Npx * var(--glass-blur-scale)))`) so blur can be switched
+     off globally in one place. Stays 1 (full glass effect) everywhere
+     except the .tv-app override right below — see that rule for why. */
+  --glass-blur-scale: 1;
+}
+
+/* The Android TV wrapper (vyzn-tv) adds this class via a tiny inline
+   script that checks navigator.userAgent for the "VyznTV" marker
+   MainActivity.kt appends to the WebView's user agent — see app.js, very
+   top of the file. backdrop-filter blur is one of the most expensive
+   things a WebView can composite: it's a full-screen GPU blur pass redone
+   on every frame anything under it moves or scrolls, and Android System
+   WebView on TV-box-class hardware (weaker GPU, no desktop-browser-grade
+   compositor tuning) handles that far worse than Chrome/Safari on a
+   phone/desktop. With 30+ blurred surfaces in this app (topbar, every
+   card's "..." menu, the genre-filter pill, Control Center, etc.), that
+   was very likely the main cause of "very slow" on a real TV box. Turning
+   the multiplier to 0 collapses every `blur(calc(Npx * 0))` to `blur(0)`
+   — a no-op filter — leaving just the plain semi-transparent rgba()
+   background each of those rules already layers the blur on top of, so
+   surfaces stay readable, just flat instead of frosted. Desktop/browser
+   use is completely unaffected (no navigator.userAgent match, no class,
+   scale stays 1, full blur as before). */
+.tv-app {
+  --glass-blur-scale: 0;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Google Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-optical-sizing: auto;
+}
+
+.hidden { display: none !important; }
+
+/* Accent-tinted scrollbar, same touch Abyss applies globally. */
+html { scrollbar-color: rgba(var(--accent-rgb), 0.5) transparent; }
+::-webkit-scrollbar-thumb { background: rgba(var(--accent-rgb), 0.5); border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* --- Sticky top nav (scan bar + topbar + genre pills, as one unit) ----- */
+
+.app-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+/* --- Scan progress bar ------------------------------------------------- */
+
+.scan-progress-bar {
+  height: 26px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.scan-progress-fill {
+  position: absolute;
+  inset: 0;
+  width: 0%;
+  background: linear-gradient(90deg, rgba(var(--accent-rgb), 0.6), var(--accent));
+  transition: width 0.3s var(--ease);
+}
+
+.scan-progress-text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 14px;
+  font-size: 12px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- Profile gate --------------------------------------------------- */
+
+.profile-gate {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  text-align: center;
+  padding: 20px;
+}
+.profile-gate h1 { font-size: 32px; font-weight: 600; margin: 0; }
+/* The wordmark SVG is much wider/shorter (260x50) than the old square-ish
+   PNG this replaced, so the width bumped up from 96px to keep a similar
+   on-screen height (~42px) instead of shrinking to an illegible sliver. */
+.gate-logo { width: 220px; height: auto; }
+
+.profile-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+}
+
+.profile-card {
+  background: none;
+  border: none;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 10px;
+  border-radius: 12px;
+  transition: transform 0.15s var(--ease);
+}
+.profile-card:hover { transform: scale(1.08); background: var(--bg-elevated); }
+
+.profile-avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 14px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 34px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.new-profile-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.new-profile-form input[type="text"] {
+  background: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.new-profile-form button {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.child-check { font-size: 13px; color: var(--text-dim); display: flex; align-items: center; gap: 6px; }
+
+/* --- Topbar controls: no enclosing bar behind them any more — each
+   button/pill carries its own frosted-glass background instead, so they
+   read as one consistent floating "control cluster" over whatever's
+   scrolling underneath (the hero, a shelf, a backdrop) rather than sitting
+   on a solid strip. Two shapes share this treatment: a square icon button
+   (.hamburger-btn / .icon-btn, 34x34, rounded corners) and a pill button
+   (.profile-btn / .genre-filter-btn, fully rounded) — same glass fill,
+   same blur, same hover step, just different silhouettes for "opens a
+   menu" vs "reads as text". */
+.profile-btn {
+  margin-left: auto;
+  background: rgba(var(--glass-tint), 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 13px;
+  backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  transition: background 0.15s var(--ease);
+}
+.profile-btn:hover { background: rgba(var(--glass-tint), 0.85); }
+
+.icon-btn {
+  background: rgba(var(--glass-tint), 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  transition: background 0.15s var(--ease), transform 0.1s var(--ease-snappy);
+}
+.icon-btn:hover { background: rgba(var(--glass-tint), 0.85); }
+.icon-btn:active { transform: scale(0.9); }
+
+.topbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+  flex-wrap: wrap;
+}
+
+.topbar-logo {
+  height: 30px;
+  width: auto;
+  display: block;
+}
+
+.tabs { display: flex; gap: 4px; }
+
+/* Abyss-style pill tab bar: fully rounded, active tab a filled pill,
+   inactive tabs pick up the accent as text color on hover (not a full
+   fill — that's reserved for the active state, so hover reads as a
+   preview rather than a second "selected" look). */
+.tab-btn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
+  padding: 6px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease), border-color 0.15s var(--ease), transform 0.1s var(--ease-snappy);
+}
+
+.tab-btn:hover:not(.active) {
+  color: var(--accent);
+  border-color: rgba(var(--accent-rgb), 0.35);
+}
+
+.tab-btn.active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+.tab-btn:active { transform: scale(0.96); }
+
+.topbar-spacer { flex: 1; }
+
+/* --- Hamburger menu button + collapsible nav drawer (Apple-style) ------- */
+
+.hamburger-btn {
+  background: rgba(var(--glass-tint), 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  transition: background 0.15s var(--ease);
+}
+.hamburger-btn:hover { background: rgba(var(--glass-tint), 0.85); }
+.hamburger-btn span {
+  display: block;
+  width: 16px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--text);
+}
+.hamburger-btn[aria-expanded="true"] span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.hamburger-btn[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
+.hamburger-btn[aria-expanded="true"] span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+.hamburger-btn span { transition: transform 0.2s var(--ease), opacity 0.2s var(--ease); }
+
+.nav-menu-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  /* Above the Movie/Show detail overlay (z-index 200) and everything else
+     that can be open underneath the hamburger menu, so opening it while a
+     detail page is showing dims that page too instead of leaving it — and
+     its stacking-through-it — fully visible. */
+  z-index: 499;
+}
+.nav-menu-scrim.hidden { display: none; }
+
+/* Reparented to a direct child of <body> in app.js (same fix as the Movie
+   Detail "..." menu below) and positioned in fixed/viewport coordinates
+   from navMenuBtn's own location — rather than position:absolute inside
+   .topbar, which trapped it inside .app-nav's own stacking context
+   (position:sticky + z-index there caps everything nested in it, no
+   matter how high a child's own z-index is) so it could never actually
+   paint above a fixed, higher-z-index overlay like the Movie/Show detail
+   page. `left`/`top` below are just an unopened fallback; positionNavMenu()
+   sets real coordinates every time it opens. */
+.nav-menu {
+  position: fixed;
+  top: 64px;
+  left: 16px;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  z-index: 500;
+  background: rgba(var(--glass-tint), 0.85);
+  backdrop-filter: blur(calc(24px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(24px * var(--glass-blur-scale)));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  transform: translateY(-8px);
+  opacity: 0;
+  transition: transform 0.18s var(--ease), opacity 0.18s var(--ease);
+}
+.nav-menu.hidden {
+  display: flex; /* keep the transition possible instead of a hard cut */
+  pointer-events: none;
+  transform: translateY(-8px);
+  opacity: 0;
+  visibility: hidden;
+}
+.nav-menu:not(.hidden) {
+  transform: translateY(0);
+  opacity: 1;
+  visibility: visible;
+}
+
+.nav-menu-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.nav-menu-tabs .tab-btn { flex: 1; text-align: center; }
+
+/* Fully rounded to match the genre-filter/genre pills' pill shape
+   (border-radius: 999px) instead of the old boxy 6px input, with the same
+   frosted-glass fill so it reads as one family of controls. */
+#search {
+  flex: 1;
+  min-width: 160px;
+  background: rgba(var(--glass-tint), 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  transition: background 0.15s var(--ease);
+}
+#search:hover, #search:focus { background: rgba(var(--glass-tint), 0.85); }
+#search:focus { outline: none; }
+
+/* --- Genre quick-filter pills ------------------------------------------ */
+
+/* --- Genre quick-filter: a single floating pill in the topbar, opening a
+   dropdown of individual genre pills — replaces the old full-width bar
+   that used to sit underneath the topbar as its own strip. Positioned
+   exactly like .nav-menu (fixed, reparented to <body> in app.js, same
+   frosted-glass/fade-in treatment) so it floats independently of the
+   topbar's own stacking context instead of getting trapped behind a
+   higher z-index overlay. */
+.genre-filter-btn {
+  background: rgba(var(--glass-tint), 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  transition: background 0.15s var(--ease);
+}
+.genre-filter-btn:hover { background: rgba(var(--glass-tint), 0.85); }
+.genre-filter-btn.hidden { display: none; }
+.genre-filter-caret { font-size: 10px; color: var(--text-dim); transition: transform 0.15s var(--ease); }
+.genre-filter-btn[aria-expanded="true"] .genre-filter-caret { transform: rotate(180deg); }
+
+.genre-pills {
+  position: fixed;
+  z-index: 500;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 14px;
+  background: rgba(var(--glass-tint), 0.85);
+  backdrop-filter: blur(calc(24px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(24px * var(--glass-blur-scale)));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  transform: translateY(-8px);
+  opacity: 0;
+  transition: transform 0.18s var(--ease), opacity 0.18s var(--ease);
+}
+.genre-pills.hidden {
+  display: flex; /* keep the transition possible instead of a hard cut */
+  pointer-events: none;
+  transform: translateY(-8px);
+  opacity: 0;
+  visibility: hidden;
+}
+.genre-pills:not(.hidden) {
+  transform: translateY(0);
+  opacity: 1;
+  visibility: visible;
+}
+
+.genre-pill {
+  flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text);
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), border-color 0.15s var(--ease), transform 0.15s var(--ease);
+}
+.genre-pill:hover { background: rgba(255, 255, 255, 0.16); transform: translateY(-1px); }
+.genre-pill.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 700;
+}
+
+/* --- Movie detail page (Apple-TV-style) --------------------------------- */
+
+.movie-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: var(--bg);
+  overflow-y: auto;
+}
+.movie-detail-overlay.hidden { display: none; }
+
+body.detail-open { overflow: hidden; }
+
+.back-btn {
+  position: fixed;
+  top: 20px;
+  left: 24px;
+  z-index: 210;
+  background: rgba(var(--glass-tint), 0.55);
+  color: #fff;
+  border: none;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+}
+.back-btn:hover { background: rgba(var(--glass-tint), 0.85); }
+.back-btn.hidden { display: none; }
+
+.movie-detail-hero {
+  position: relative;
+  min-height: 58vh;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+.movie-detail-backdrop {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center 20%;
+  transform: scale(1.02);
+}
+.movie-detail-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(var(--glass-tint),0.15) 0%, rgba(var(--glass-tint),0.65) 60%, var(--bg) 100%),
+              linear-gradient(90deg, rgba(var(--glass-tint),0.85) 0%, rgba(var(--glass-tint),0.1) 55%);
+}
+.movie-detail-header {
+  position: relative;
+  z-index: 1;
+  /* Top padding reserves clearance under the fixed "← Back" button
+     (.back-btn, position: fixed at the top-left of the whole overlay).
+     .movie-detail-hero centers this header with align-items: flex-end, so
+     on a tall header (long overview, wrapped genre tags — common in
+     portrait on a phone) the box grows upward and the title can end up
+     right at the very top of the screen, underneath that fixed button,
+     with no top padding to stop it. This guarantees the title always
+     clears it regardless of how tall the rest of the header gets. */
+  padding: 64px 44px 32px;
+  max-width: 720px;
+}
+.movie-detail-header h2 {
+  font-size: 40px;
+  margin: 0 0 10px;
+  font-weight: 700;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+}
+.movie-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+.genre-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.genre-tag {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--text);
+  padding: 4px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s var(--ease);
+}
+.genre-tag:hover { background: rgba(255, 255, 255, 0.22); }
+
+.movie-detail-overview {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #c9c9d0;
+  margin: 0 0 12px;
+}
+.movie-detail-crew {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin: 0 0 22px;
+}
+.movie-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* --- Movie Detail page "..." action menu (Mark as Watched, Edit Match) - */
+
+.detail-menu-wrap { position: relative; }
+.detail-menu-btn {
+  width: 44px;
+  padding: 10px 0;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: 1px;
+}
+/* position: fixed (not absolute) and reparented to <body> in app.js — the
+   menu lives inside .movie-detail-hero, which has overflow: hidden to keep
+   its scaled backdrop image from bleeding out. An absolutely-positioned
+   dropdown there gets its bottom edge silently clipped by that overflow
+   whenever the header is tall (long overview text, wrapped genre tags —
+   common on a narrow phone). Moving it out to <body> and positioning it
+   with fixed coordinates (set in positionDetailMenu()) sidesteps that
+   entirely, and also means it's never cut off by the screen edge either. */
+.detail-menu {
+  position: fixed;
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(var(--glass-tint), 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  z-index: 500;
+  backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+.detail-menu button {
+  background: none;
+  border: none;
+  color: var(--text);
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease), font-weight 0.15s var(--ease);
+}
+.detail-menu button:hover { background: var(--accent); color: var(--accent-contrast); font-weight: 700; }
+
+.detail-progress-wrap { max-width: 280px; margin-top: 14px; }
+.detail-progress-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.detail-progress-fill { height: 100%; background: var(--accent); }
+
+.cast-track { gap: 20px; }
+.cast-card { flex: 0 0 100px; width: 100px; text-align: center; cursor: default; }
+.cast-avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #232323;
+  margin: 0 auto 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: var(--text-dim);
+}
+.cast-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.cast-name { font-size: 12px; font-weight: 600; margin: 0; line-height: 1.3; }
+.cast-character { font-size: 11px; color: var(--text-dim); margin: 2px 0 0; line-height: 1.3; }
+
+/* --- Hero spotlight header -------------------------------------------- */
+
+.hero {
+  /* Truly fixed to the viewport, not sticky: on the Home tab this now
+     stays completely in place — full size, fully visible, never covered
+     — for as long as Home is showing. It does NOT reserve space in the
+     page's normal flow (that's what "fixed" does), so .rows below adds
+     its own top offset to start right after the hero's bottom edge
+     instead of underneath it — see .rows for the other half of this.
+     top: 0 lines its top edge up with .app-nav's (also anchored at the
+     viewport top, in-flow via position: sticky), which is what lets the
+     backdrop image extend underneath the now-transparent topbar/genre
+     cluster the way it did before, without needing a negative margin
+     trick: .app-nav's higher z-index (20 vs. 1 here) just paints over
+     the top slice of this box.
+     Only ever shown on Home (hidden on every other tab), so there's no
+     "stuck banner" left behind when navigating away — the .hidden class
+     removes it from layout entirely. */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  height: var(--hero-height);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.hero-backdrop {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center 20%;
+  transform: scale(1.02);
+}
+
+.hero-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(var(--glass-tint),0.1) 0%, rgba(var(--glass-tint),0.55) 55%, var(--bg) 100%),
+              linear-gradient(90deg, rgba(var(--glass-tint),0.85) 0%, rgba(var(--glass-tint),0.15) 55%);
+}
+
+.hero-content {
+  position: relative;
+  z-index: 1;
+  padding: 0 40px 32px;
+  max-width: 640px;
+}
+
+.hero-content h2 {
+  font-size: 48px;
+  margin: 0 0 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-shadow: 0 2px 16px rgba(0,0,0,0.6);
+}
+
+.hero-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* Abyss-style metadata pills — each fact (rating, year, runtime) in its
+   own small frosted-glass badge instead of plain text with separators. */
+.hero-meta > span:not(:empty) {
+  background: rgba(var(--glass-tint), 0.7);
+  backdrop-filter: blur(calc(10px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(10px * var(--glass-blur-scale)));
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-weight: 500;
+}
+
+.rating-badge { font-weight: 700; }
+
+.hero-content p {
+  font-size: 15px;
+  line-height: 1.5;
+  color: #c9c9d0;
+  margin: 0 0 20px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* The hero no longer has its own Play/Info buttons — the whole content
+   block (title/meta/overview) is the click target now, same as a card,
+   so it needs to look and behave like one: pointer cursor, a focus ring
+   for keyboard nav (it's tabindex="0" + role="button" in the markup),
+   and no default button outline styling since it's a div. */
+.hero-content {
+  cursor: pointer;
+  outline: none;
+  border-radius: var(--card-radius);
+}
+.hero-content:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 6px;
+}
+
+.btn-primary, .btn-secondary {
+  padding: 10px 22px;
+  border-radius: var(--card-radius);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s var(--ease), transform 0.15s var(--ease);
+}
+.btn-primary { background: var(--accent); color: var(--accent-contrast); }
+.btn-primary:hover { background: #fff; transform: translateY(-1px); }
+.btn-secondary {
+  background: rgba(var(--accent-rgb), 0.15);
+  color: var(--text);
+  backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+}
+.btn-secondary:hover { background: rgba(var(--accent-rgb), 0.25); }
+/* Snappy press feedback (Abyss's --abyss-ease-snappy touch) — a quick,
+   slight scale-down that reads as "the button registered your tap"
+   independent of whatever the hover state is doing. */
+.btn-primary:active, .btn-secondary:active { transform: scale(0.96); transition-duration: 0.1s; transition-timing-function: var(--ease-snappy); }
+
+/* Circular icon-only action buttons on Movie/Show Detail's action bar
+   (Watchlist, Watch Trailer, Watched, Edit Match) — frosted-glass circles
+   so Play stays the one filled pill and everything beside it reads as a
+   secondary, icon-only action. */
+.btn-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(var(--glass-tint), 0.6);
+  backdrop-filter: blur(calc(10px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(10px * var(--glass-blur-scale)));
+  color: var(--text);
+  font-size: 17px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease), transform 0.1s var(--ease-snappy);
+}
+.btn-icon:hover { background: rgba(var(--glass-tint), 0.85); }
+.btn-icon:active { transform: scale(0.9); }
+.btn-icon.hidden { display: none; }
+.btn-icon:disabled { opacity: 0.5; cursor: default; }
+/* "On" state (in watchlist / marked watched) — filled with the accent
+   color instead of glass, the same visual language .genre-pill.active and
+   .btn-primary already use for "this is the active/selected one". */
+.btn-icon.active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+.btn-icon.active:hover { background: var(--accent); opacity: 0.9; }
+
+/* TMDB score badge in the meta row, next to the content-rating/year/runtime
+   pills — same pill shape as .rating-badge's siblings, distinguished with a
+   little extra weight so it doesn't get lost among plain text. */
+.score-badge {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+.score-badge.hidden { display: none; }
+
+/* Video/Audio/Subtitles info rows on Movie Detail — plain label/value pairs
+   pulled straight from the scanned file's own ffprobe data, styled like a
+   compact spec sheet rather than another prose paragraph. */
+.detail-info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 18px;
+  font-size: 13px;
+  max-width: 360px;
+}
+.detail-info-grid.hidden { display: none; }
+.detail-info-row { display: flex; gap: 10px; }
+.detail-info-label { color: var(--text-dim); width: 76px; flex: none; }
+.detail-info-value { color: var(--text); }
+
+/* --- Horizontal shelves -------------------------------------------- */
+
+.rows {
+  /* .hero is position: fixed, so it takes up no space in the page's
+     normal flow — without help, .rows would start right under .app-nav
+     and render its first shelf hidden behind the fixed hero. This margin
+     pushes it down to start exactly where the hero's bottom edge is
+     (--hero-height covers the .app-nav strip too, since both are
+     anchored at the viewport top — see .hero — so we only need to make
+     up the difference, not the full hero height again).
+     Then it becomes its OWN scroll container, sized to exactly the
+     leftover viewport below the hero, with its own internal scrollbar.
+     That's what makes shelves disappear off the top edge of this box as
+     you scroll, rather than sliding up and covering the banner: the
+     banner is never in this box's coordinate space at all, so there's
+     nothing for the shelves to scroll "over". min-height is a floor for
+     very short viewports (a small landscape phone window) where the
+     calc could otherwise go to zero or negative. */
+  margin-top: calc(var(--hero-height) - var(--nav-height));
+  height: calc(100vh - var(--hero-height));
+  min-height: 200px;
+  overflow-y: auto;
+  padding: 24px 0 40px;
+}
+
+/* Abyss-style staggered fade-up entrance: each shelf rises in slightly
+   after the one before it. Capped at 8 explicit delays — any shelf beyond
+   that just uses the last delay, which is unnoticeable in practice. */
+@keyframes shelf-fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.shelf {
+  margin-bottom: 34px;
+  animation: shelf-fade-up 0.5s var(--ease) both;
+}
+.rows > .shelf:nth-child(1) { animation-delay: 0.02s; }
+.rows > .shelf:nth-child(2) { animation-delay: 0.08s; }
+.rows > .shelf:nth-child(3) { animation-delay: 0.14s; }
+.rows > .shelf:nth-child(4) { animation-delay: 0.2s; }
+.rows > .shelf:nth-child(5) { animation-delay: 0.26s; }
+.rows > .shelf:nth-child(6) { animation-delay: 0.32s; }
+.rows > .shelf:nth-child(7) { animation-delay: 0.38s; }
+.rows > .shelf:nth-child(n+8) { animation-delay: 0.44s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .shelf { animation: none; }
+}
+.shelf h3 {
+  margin: 0 0 12px;
+  padding: 0 40px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.shelf-track {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding: 4px 40px 16px;
+  scroll-behavior: smooth;
+}
+.shelf-track::-webkit-scrollbar { height: 6px; }
+.shelf-track::-webkit-scrollbar-thumb { background: rgba(var(--accent-rgb), 0.4); border-radius: 3px; }
+
+.shelf-track .card {
+  flex: 0 0 160px;
+  width: 160px;
+}
+
+.progress-bar {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 4px;
+  background: rgba(0,0,0,0.5);
+}
+.progress-fill { height: 100%; background: var(--accent); }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 18px;
+  padding: 20px;
+}
+
+/* Divider between local library matches and extra Seerr search results in
+   the same grid — grid-column: 1 / -1 makes it span every column instead
+   of becoming just another cell. */
+.grid-section-heading {
+  grid-column: 1 / -1;
+  margin: 4px 0 -4px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.empty-state {
+  color: var(--text-dim);
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 0;
+}
+
+.card {
+  position: relative;
+  cursor: pointer;
+  border-radius: var(--card-radius);
+  overflow: visible;
+  background: var(--bg-elevated);
+  border: 1px solid transparent;
+  transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease), border-color 0.18s var(--ease);
+}
+.card:hover {
+  transform: scale(1.06) translateY(-4px);
+  border-color: rgba(var(--accent-rgb), 0.35);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+  z-index: 2;
+}
+.card .poster-wrap { border-radius: var(--card-radius); }
+
+/* --- Card 3-dot action menu -------------------------------------------- */
+
+.card-menu-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(var(--glass-tint), 0.55);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.15s var(--ease), transform 0.15s var(--ease), background 0.15s var(--ease);
+  z-index: 3;
+  backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+}
+.card:hover .card-menu-btn,
+.card:focus-within .card-menu-btn { opacity: 1; transform: translateY(0); }
+.card-menu-btn:hover { background: rgba(var(--glass-tint), 0.85); }
+
+/* Whole-item "watched" checkmark — a filled accent circle with a dark
+   check, top-left so it never collides with the "..." menu button's own
+   top-right corner. */
+.watched-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.card-menu {
+  position: absolute;
+  top: 34px;
+  right: 6px;
+  min-width: 150px;
+  display: none;
+  flex-direction: column;
+  background: rgba(var(--glass-tint), 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  z-index: 4;
+  backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+}
+.card-menu.open { display: flex; }
+.card-menu button {
+  background: none;
+  border: none;
+  color: var(--text);
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease), font-weight 0.15s var(--ease);
+}
+.card-menu button:hover { background: var(--accent); color: var(--accent-contrast); font-weight: 700; }
+
+.card .poster-wrap {
+  position: relative;
+  aspect-ratio: 2 / 3;
+  background: #232323;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.card .no-poster {
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 8px;
+  text-align: center;
+}
+
+.card .card-info {
+  padding: 8px 10px;
+}
+
+.card .card-title {
+  font-size: 13px;
+  line-height: 1.3;
+  margin: 0 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card .card-year {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+/* --- Discovery card (recommendation/search hits not in the library) ----- */
+
+/* Not clickable to a detail/player page like a real library card (there's
+   nothing local to open), so no pointer cursor/hover-lift on the card
+   itself — only the "Add to Library" button below is interactive. */
+.card-discovery { cursor: default; }
+.card-discovery:hover { transform: none; box-shadow: none; border-color: transparent; }
+
+.not-owned-badge {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 3px 6px;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--text-dim);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(calc(6px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(6px * var(--glass-blur-scale)));
+}
+
+.request-btn {
+  display: block;
+  width: calc(100% - 20px);
+  margin: 0 10px 10px;
+  padding: 6px 0;
+  border: 1px solid rgba(var(--accent-rgb), 0.5);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+.request-btn:hover:not(:disabled) { background: var(--accent); color: var(--accent-contrast); }
+.request-btn:disabled { opacity: 0.5; cursor: default; border-color: rgba(255, 255, 255, 0.15); color: var(--text-dim); }
+
+.show-detail-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 90;
+  padding: 40px 20px;
+  overflow-y: auto;
+}
+.show-detail-overlay.hidden { display: none; }
+
+.show-detail-box {
+  width: 100%;
+  max-width: 760px;
+  background: var(--bg-elevated);
+  border-radius: 12px;
+  padding: 28px;
+  position: relative;
+}
+
+/* Unused now that Show Detail is a full page (.movie-detail-header is used
+   there instead) — .show-detail-header/-box/-overlay still back the
+   Settings modal, which stays a small centered dialog on purpose. */
+.show-detail-header h2 { margin: 0 0 8px; font-size: 24px; }
+.show-detail-header p { margin: 0 0 20px; color: var(--text-dim); font-size: 14px; line-height: 1.5; }
+
+/* Wraps the season tab bar + episode list below Show Detail's hero — the
+   hero itself (.movie-detail-hero/.movie-detail-header) handles its own
+   padding, but this section sits directly on the page background and needs
+   its own side padding to line up with the shelves below it and the hero
+   above it (matches .shelf h3's 40px, see the responsive overrides for how
+   that narrows on smaller screens). */
+.show-detail-body { padding: 0 40px 8px; }
+
+.theme-toggle-btn { width: 48px; padding: 10px 0; font-size: 18px; }
+
+.season-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 20px;
+  scrollbar-width: thin;
+}
+.season-tabs::-webkit-scrollbar { height: 6px; }
+
+.season-tab-btn {
+  flex: 0 0 auto;
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
+  padding: 7px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.season-tab-btn.active { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); font-weight: 700; }
+
+.episode-list { display: flex; flex-direction: column; gap: 10px; }
+
+.episode-row {
+  display: flex;
+  gap: 14px;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s var(--ease);
+}
+.episode-row:hover { background: #333333; }
+
+.episode-thumb {
+  position: relative;
+  flex: 0 0 160px;
+  width: 160px;
+  aspect-ratio: 16 / 9;
+  background: #232323;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.episode-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.episode-meta { flex: 1; min-width: 0; }
+.episode-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 4px;
+}
+.episode-title { margin: 0; font-size: 14px; font-weight: 600; }
+.episode-runtime { font-size: 12px; color: var(--text-dim); flex-shrink: 0; }
+.episode-overview {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.settings-box { max-width: 640px; }
+.settings-box h2 { margin: 0 0 20px; font-size: 22px; }
+
+.settings-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 18px;
+  margin-top: 18px;
+}
+.settings-section:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+.settings-section h3 { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
+
+.settings-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.settings-actions .btn-secondary,
+.settings-subrow .btn-secondary {
+  padding: 8px 16px;
+  font-size: 13px;
+  border-radius: 6px;
+}
+
+.settings-info {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 14px;
+  min-height: 18px;
+}
+
+.settings-subrow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.settings-subrow input[type="text"],
+.settings-subrow input[type="password"] {
+  flex: 1;
+  min-width: 200px;
+  background: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+/* Connections settings form (TMDB/Seerr/transcode/Tailscale key) — one
+   field per entry in src/config.js's SCHEMA, built dynamically by
+   loadConfigForm() in app.js. */
+.config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.config-field {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+.config-field-label {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+}
+.config-field input[type="text"],
+.config-field input[type="password"] {
+  background: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.config-field input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  justify-self: start;
+}
+.config-field-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.danger-row {
+  background: rgba(220, 80, 80, 0.08);
+  border: 1px solid rgba(220, 80, 80, 0.25);
+  border-radius: 8px;
+  padding: 12px 14px;
+  justify-content: space-between;
+}
+.danger-row span { font-size: 13px; color: var(--text-dim); flex: 1; min-width: 200px; }
+
+.btn-danger {
+  background: #c0392b;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.btn-danger:hover { background: #d94433; }
+
+.settings-profile-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+
+.settings-profile-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #1c1c1c;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+  flex-wrap: wrap;
+}
+
+.settings-profile-row input[type="text"] {
+  background: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  width: 140px;
+}
+
+.settings-profile-row select {
+  background: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.settings-profile-row .child-check { font-size: 12px; white-space: nowrap; }
+
+.settings-profile-row .spacer { flex: 1; }
+
+.settings-add-profile { margin-top: 4px; }
+
+.count-badge {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 400;
+  padding: 1px 8px;
+  border-radius: 10px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.settings-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+
+.unmatched-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 340px;
+  overflow-y: auto;
+  margin-bottom: 4px;
+}
+
+.unmatched-row {
+  background: #1c1c1c;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.unmatched-row .unmatched-filename {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 0 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.unmatched-row .unmatched-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.unmatched-row input[type="text"] {
+  flex: 1;
+  min-width: 160px;
+  background: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.unmatched-row select {
+  background: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.unmatched-row .unmatched-status {
+  font-size: 12px;
+  margin-top: 6px;
+}
+.unmatched-row .unmatched-status.ok { color: #6fcf8f; }
+.unmatched-row .unmatched-status.err { color: #e57373; }
+
+/* --- Movie detail page: "Edit Match" inline panel ------------------------ */
+.edit-match-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(20,21,28,0.6);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  max-width: 520px;
+}
+.edit-match-panel.hidden { display: none; }
+.edit-match-panel input[type="text"] {
+  flex: 1;
+  min-width: 160px;
+  background: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.edit-match-panel select {
+  background: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  padding: 7px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.edit-match-panel .unmatched-status {
+  flex-basis: 100%;
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+.edit-match-panel .unmatched-status.ok { color: #6fcf8f; }
+.edit-match-panel .unmatched-status.err { color: #e57373; }
+
+.settings-system-info {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  font-size: 13px;
+  margin: 0;
+}
+.settings-system-info dt { color: var(--text-dim); }
+.settings-system-info dd { margin: 0; }
+
+/* .btn-secondary's shared rules assume a <button> (inline by default
+   doesn't matter there since buttons are inline-block already) — this one
+   is a plain <a download> instead (see index.html's comment on why), which
+   needs an explicit display to pick up its padding/sizing the same way. */
+#downloadLogBtn {
+  display: inline-block;
+  margin-top: 14px;
+  text-decoration: none;
+}
+
+.player-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+}
+.player-overlay.hidden { display: none; }
+
+.player-box {
+  width: 100%;
+  max-width: 960px;
+  position: relative;
+}
+
+.player-meta { padding: 12px 4px; }
+.player-meta h2 { margin: 0 0 6px; font-size: 18px; }
+.player-meta p { margin: 0; color: var(--text-dim); font-size: 14px; line-height: 1.4; }
+
+.close-btn {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 28px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+/* --- Hero-preview focus ------------------------------------------------- */
+
+/* A card is focusable (tabindex=0) so a keyboard/remote can drive the
+   top-shelf hero preview the same way a mouse hover does — but we draw our
+   own focus treatment (the card already scales up) rather than the
+   browser's default outline, which looks out of place here. */
+.card:focus { outline: none; }
+.card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Same treatment for every other focusable control, so D-pad/remote
+   spatial navigation (see app.js) is always clearly visible, not just on
+   poster cards — buttons, inputs, pills, and the episode list all get a
+   consistent, fairly prominent ring since this needs to read from across
+   a room on a TV, not just up close on a desktop. */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+.episode-row:focus-visible,
+.genre-pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* :focus-visible is a heuristic ("was this focus keyboard-like?") that
+   desktop Chrome/Safari apply consistently to a script-driven .focus()
+   call, but WebView implementations — especially the older/lighter-weight
+   System WebView builds common on budget Android TV boxes — aren't
+   guaranteed to. In the TV app there's no mouse at all: every single
+   focus change comes from focusInDirection() in app.js responding to the
+   remote's D-pad, so it should always be visible, never conditionally. If
+   :focus-visible isn't firing reliably there, cards/buttons/pills focus
+   silently with zero visual feedback — you can't tell where you are,
+   which reads as "clunky" even though navigation is actually working.
+   This repeats the same rule on plain :focus, but scoped to .tv-app only
+   (see the UA-sniff script in index.html) so desktop/browser use is
+   unaffected — a mouse click there still won't show a ring. */
+.tv-app .card:focus,
+.tv-app button:focus,
+.tv-app input:focus,
+.tv-app select:focus,
+.tv-app .episode-row:focus,
+.tv-app .genre-pill:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- Control Center (slide-out glass panel) ----------------------------- */
+
+.control-center-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 220;
+}
+.control-center-scrim.hidden { display: none; }
+
+.control-center {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 380px;
+  max-width: 88vw;
+  z-index: 221;
+  background: rgba(var(--glass-tint), 0.72);
+  backdrop-filter: blur(calc(30px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(30px * var(--glass-blur-scale)));
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: -20px 0 50px rgba(0, 0, 0, 0.4);
+  padding: 28px 24px;
+  overflow-y: auto;
+  transform: translateX(0);
+  transition: transform 0.25s var(--ease);
+}
+.control-center.hidden {
+  display: block; /* keep transform transition possible instead of a hard cut */
+  transform: translateX(100%);
+  pointer-events: none;
+}
+.control-center h2 { margin: 0 0 20px; font-size: 20px; }
+
+.cc-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 18px;
+  margin-top: 18px;
+}
+.cc-section:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+.cc-section h3 { margin: 0 0 12px; font-size: 14px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.04em; }
+
+.cc-profile-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+
+.cc-profile-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
+  border-radius: var(--card-radius);
+  padding: 8px 10px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+  font-size: 14px;
+  transition: background 0.15s var(--ease);
+}
+.cc-profile-row:hover { background: rgba(var(--accent-rgb), 0.12); }
+.cc-profile-row.active { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.15); }
+
+.cc-profile-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cc-full-btn { width: 100%; text-align: center; }
+
+.cc-quick-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.cc-quick-actions .btn-secondary { padding: 8px 14px; font-size: 13px; border-radius: var(--card-radius); }
+
+.cc-subpanel {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--card-radius);
+  padding: 12px 14px;
+  margin-top: 10px;
+}
+/* Settings' "Preferred audio language" field (Playback section). */
+.audio-pref-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-dim); margin-bottom: 10px; }
+.audio-pref-field select {
+  background: #161616;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  max-width: 260px;
+}
+
+/* --- Trailer modal (Movie/Show Detail's "Watch Trailer" button) -------- */
+
+.trailer-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.trailer-modal.hidden { display: none; }
+.trailer-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 6, 9, 0.88);
+  backdrop-filter: blur(calc(16px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(16px * var(--glass-blur-scale)));
+}
+.trailer-modal-box {
+  position: relative;
+  width: 100%;
+  max-width: 960px;
+}
+.trailer-modal-frame-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  background: #000;
+}
+.trailer-modal-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: none; }
+.trailer-modal-close {
+  position: absolute;
+  top: -46px;
+  right: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(var(--glass-tint), 0.6);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.trailer-modal-close:hover { background: rgba(var(--glass-tint), 0.9); }
+
+/* --- App switcher (active streams, tvOS-multitasking-style tiles) ------- */
+
+.app-switcher-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  background: rgba(10, 10, 14, 0.75);
+  backdrop-filter: blur(calc(10px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(10px * var(--glass-blur-scale)));
+  display: flex;
+  flex-direction: column;
+  padding: 32px 0;
+}
+.app-switcher-overlay.hidden { display: none; }
+
+.app-switcher-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px 20px;
+}
+.app-switcher-header h2 { margin: 0; font-size: 22px; }
+.app-switcher-header .close-btn { position: static; }
+
+.app-switcher-track {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  overflow-x: auto;
+  padding: 10px 40px 20px;
+}
+
+.app-switcher-tile {
+  position: relative;
+  flex: 0 0 220px;
+  width: 220px;
+  aspect-ratio: 16 / 10;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--bg-elevated) center / cover no-repeat;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s var(--ease);
+}
+.app-switcher-tile:hover { transform: translateY(-6px); }
+
+.app-switcher-tile-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.75) 100%);
+  display: flex;
+  align-items: flex-end;
+  padding: 12px;
+}
+.app-switcher-tile-title {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.app-switcher-tile-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.app-switcher-tile-close:hover { background: rgba(220, 60, 60, 0.85); }
+
+.app-switcher-empty { color: var(--text-dim); padding: 0 40px; }
+
+/* --- Custom player controls (minimalist scrubber bar) ------------------- */
+
+.video-wrap { position: relative; }
+
+.video-wrap video {
+  width: 100%;
+  max-height: 70vh;
+  background: #000;
+  border-radius: 6px;
+  display: block;
+  cursor: pointer;
+}
+
+/* --- Player loading / buffering / error overlay ------------------------- */
+
+.player-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  border-radius: 6px;
+  background: rgba(var(--glass-tint), 0.72);
+  backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  text-align: center;
+  padding: 20px;
+  z-index: 2;
+}
+.player-loading.hidden { display: none; }
+
+.player-loading-spinner {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 3px solid rgba(var(--accent-rgb), 0.25);
+  border-top-color: var(--accent);
+  animation: player-spin 0.8s linear infinite;
+}
+@keyframes player-spin {
+  to { transform: rotate(360deg); }
+}
+
+.player-loading-text {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  max-width: 320px;
+}
+
+.player-loading-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+.player-loading-actions.hidden { display: none; }
+
+/* Error state: no spinner, just the message + actions — set on
+   #playerLoading via classList.toggle('player-loading--error', ...) in
+   app.js rather than a second markup block, so it shares the same
+   glass/position/sizing as the loading state. */
+.player-loading--error .player-loading-spinner { display: none; }
+.player-loading--error .player-loading-text { color: var(--text); font-size: 15px; font-weight: 600; }
+
+/* Playback now requests real (OS/browser-level) fullscreen automatically
+   on open (see enterPlayerFullscreen() in app.js) rather than only via the
+   manual ⛶ button — without this override the video stayed capped at the
+   windowed-mode 70vh/rounded-corner look even while "fullscreen",
+   letterboxed inside an otherwise-black screen instead of actually filling
+   it. :-webkit-full-screen covers the older prefixed form some WebViews
+   (including the Android TV wrapper) still use. */
+.video-wrap:fullscreen,
+.video-wrap:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+.video-wrap:fullscreen video,
+.video-wrap:-webkit-full-screen video {
+  width: auto;
+  height: auto;
+  max-width: 100vw;
+  max-height: 100vh;
+  border-radius: 0;
+}
+
+.player-controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 12px 16px 14px;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(var(--glass-tint),0.75) 45%, rgba(var(--glass-tint),0.94) 100%);
+  backdrop-filter: blur(calc(16px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(16px * var(--glass-blur-scale)));
+  border-radius: 0 0 6px 6px;
+  opacity: 0;
+  /* Hidden controls shouldn't be clickable — without this, an invisible
+     seek bar/button still sits there capturing the tap that's supposed to
+     just reveal it again. Visibility is driven entirely by JS
+     (showPlayerControls()/scheduleHideControls() in app.js) rather than
+     :hover/:focus-within, since a stationary mouse cursor resting over the
+     video would otherwise keep them pinned open forever. */
+  pointer-events: none;
+  transform: translateY(6px);
+  transition: opacity 0.2s var(--ease), transform 0.2s var(--ease);
+}
+.player-controls.force-visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+/* Applied together with hiding the controls, for the same reason a
+   fullscreen desktop video player hides the cursor when idle — nothing
+   else on screen needs a mouse pointer while it's just playing. */
+.video-wrap.cursor-hidden,
+.video-wrap.cursor-hidden video { cursor: none; }
+
+.player-scrub-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.player-time { color: #fff; font-size: 12px; font-variant-numeric: tabular-nums; min-width: 38px; text-align: center; }
+
+.player-seek {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+}
+.player-seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+}
+.player-seek::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+}
+
+.player-actions-row { display: flex; align-items: center; gap: 10px; }
+
+.player-icon-btn {
+  /* Flat at rest — like Abyss's OSD, icons carry no button "chrome" of
+     their own; only a hover/focus reveals the circular backing. */
+  background: none;
+  border: none;
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s var(--ease), transform 0.1s var(--ease-snappy);
+}
+.player-icon-btn:hover, .player-icon-btn:focus-visible { background: rgba(255, 255, 255, 0.18); }
+.player-icon-btn:active { transform: scale(0.88); }
+.player-icon-btn.hidden { display: none; }
+
+.player-replay-btn {
+  width: auto;
+  border-radius: 16px;
+  padding: 0 12px;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.player-replay-cc {
+  font-size: 9px;
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+.player-replay-btn.active { background: var(--accent); color: var(--accent-contrast); }
+.player-replay-btn.active .player-replay-cc { border-color: rgba(18, 18, 18, 0.5); }
+
+.player-track-select {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #fff;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  max-width: 120px;
+}
+.player-track-select.hidden { display: none; }
+
+.player-subtitle-active { background: var(--accent) !important; color: var(--accent-contrast) !important; }
+
+/* --- Post-playback: "Up Next" + end-of-playback recommendations -------- */
+
+/* Small corner card, not a full takeover — playback is still visible
+   (and still playing, right up until Play Now/the countdown ends) behind
+   it, same spirit as the auto-hiding transport controls it sits above. */
+.up-next-overlay {
+  position: absolute;
+  right: 20px;
+  bottom: 96px;
+  width: 320px;
+  max-width: calc(100% - 40px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(var(--glass-tint), 0.92);
+  backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(20px * var(--glass-blur-scale)));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--card-radius);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  transform: translateY(12px);
+  opacity: 0;
+  transition: transform 0.25s var(--ease), opacity 0.25s var(--ease);
+}
+.up-next-overlay.hidden { display: none; }
+.up-next-overlay:not(.hidden) { transform: translateY(0); opacity: 1; }
+
+.up-next-cancel {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s var(--ease);
+}
+.up-next-cancel:hover { background: rgba(0, 0, 0, 0.65); }
+
+.up-next-thumb {
+  flex: 0 0 96px;
+  width: 96px;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #232323;
+}
+.up-next-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.up-next-info { flex: 1; min-width: 0; }
+.up-next-label {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.up-next-title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.up-next-countdown { margin: 0; font-size: 12px; color: var(--text-dim); }
+
+.up-next-play-btn { padding: 8px 14px; font-size: 13px; white-space: nowrap; }
+
+/* End-of-playback recommendations — a full takeover of the video area
+   (the title just ended, so there's nothing to protect the view of),
+   reusing the same .card/.poster-wrap components the rest of the app
+   already builds shelves out of. */
+.recs-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--glass-tint), 0.96);
+  backdrop-filter: blur(calc(30px * var(--glass-blur-scale)));
+  -webkit-backdrop-filter: blur(calc(30px * var(--glass-blur-scale)));
+  opacity: 0;
+  transition: opacity 0.3s var(--ease);
+}
+.recs-overlay.hidden { display: none; }
+.recs-overlay:not(.hidden) { opacity: 1; }
+
+.recs-content {
+  width: 100%;
+  max-width: 960px;
+  padding: 0 32px;
+  text-align: center;
+}
+.recs-heading {
+  margin: 0 0 24px;
+  font-size: 26px;
+  font-weight: 700;
+}
+.recs-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 18px;
+  margin-bottom: 28px;
+}
+.recs-grid .card-info { text-align: left; }
+
+/* =========================================================================
+   Responsive: portrait / landscape / large-screen tuning
+   ---------------------------------------------------------------------
+   Everything above is written for a mid-size landscape/desktop browser
+   window, which is where this was originally built. The rules below adapt
+   it rather than replace it:
+   - narrow screens (mostly portrait phones/tablets): smaller type, tighter
+     padding, a topbar that reflows onto two clean rows instead of wrapping
+     mid-control, smaller poster/cast/episode cards so more fits on screen.
+   - short landscape viewports (a phone turned sideways): the hero/detail
+     backdrops are viewport-height-based, which gets cramped once there's
+     very little vertical space to work with, so those get capped.
+   - very large screens (a TV, eventually — this is also where the Google
+     TV client's browser-based fallback would land): shelves/grid get a
+     bit more breathing room instead of stretching thin, sparse cards.
+   ========================================================================= */
+
+/* --- Narrow screens (phones, most tablets in portrait) ------------------ */
+@media (max-width: 640px) {
+  .topbar { padding: 10px 14px; gap: 8px; }
+  .topbar-logo { height: 24px; }
+  .nav-menu { left: 8px; width: calc(100vw - 16px); }
+
+  .genre-pills { left: 8px; width: calc(100vw - 16px); }
+  #genreFilterLabel { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: bottom; }
+  .back-btn { top: 12px; left: 12px; padding: 7px 14px; font-size: 13px; }
+
+  /* Lowers the floor from the base clamp's 420px so short phone screens
+     aren't forced into an oversized hero — overriding the shared
+     --hero-height variable (not .hero's box model directly) keeps .rows'
+     offset/scroll-height calc in sync automatically. */
+  :root { --hero-height: clamp(260px, 56vh, 720px); }
+  .hero-content { padding: 0 18px 22px; max-width: none; }
+  .hero-content h2 { font-size: 26px; }
+  .hero-content p { -webkit-line-clamp: 2; font-size: 14px; }
+
+  .movie-detail-hero { min-height: 42vh; }
+  .movie-detail-header { padding: 56px 18px 22px; max-width: none; }
+  .movie-detail-header h2 { font-size: 26px; }
+  .movie-detail-overview { font-size: 14px; }
+
+  .shelf h3 { padding: 0 18px; font-size: 16px; }
+  .shelf-track { padding: 4px 18px 14px; gap: 12px; }
+  .shelf-track .card { flex-basis: 128px; width: 128px; }
+
+  .cast-card { flex-basis: 78px; width: 78px; }
+  .cast-avatar { width: 64px; height: 64px; font-size: 18px; }
+
+  .grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; padding: 14px; }
+
+  .show-detail-body { padding: 0 18px 8px; }
+  .episode-thumb { flex-basis: 100px; width: 100px; }
+  .episode-title-row { flex-wrap: wrap; gap: 4px; }
+
+  /* Settings is still the only thing using this centered-dialog pattern
+     (Show Detail moved to the full-page .movie-detail-overlay layout
+     above) — kept for it. */
+  .show-detail-overlay { padding: 20px 10px; }
+  .show-detail-box, .settings-box { padding: 18px; }
+
+  .up-next-overlay { left: 12px; right: 12px; width: auto; bottom: 84px; }
+  .up-next-thumb { flex-basis: 72px; width: 72px; }
+  .recs-content { padding: 0 16px; }
+  .recs-heading { font-size: 20px; margin-bottom: 16px; }
+  .recs-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+}
+
+/* --- Short landscape viewports (a phone turned sideways) ---------------- */
+@media (orientation: landscape) and (max-height: 500px) {
+  .topbar { padding: 8px 16px; }
+  /* Same reasoning as the narrow-screen override above: resize via the
+     shared variable so .rows stays in sync. */
+  :root { --hero-height: 68vh; }
+  .hero-content { padding-bottom: 14px; }
+  .hero-content p { -webkit-line-clamp: 2; }
+  .movie-detail-hero { min-height: 0; height: 78vh; }
+  .profile-gate { gap: 16px; padding: 16px; }
+  .gate-logo { width: 150px; }
+  .profile-avatar { width: 60px; height: 60px; font-size: 24px; }
+  .video-wrap video { max-height: 88vh; }
+}
+
+/* --- Large screens (wide desktop windows, TVs) --------------------------- */
+@media (min-width: 1600px) {
+  .shelf-track .card { flex-basis: 200px; width: 200px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+  .hero-content, .movie-detail-header { max-width: 900px; }
+  .hero-content h2, .movie-detail-header h2 { font-size: 52px; }
+}

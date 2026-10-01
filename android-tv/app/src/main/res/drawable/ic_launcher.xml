@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Real launcher icon — the same chevron mark used everywhere else in the
+     app now (media-server/public/assets/vyzn-mark.svg), redrawn as a
+     VectorDrawable so it stays crisp at any density with no PNG export
+     step. Coordinates are the source SVG's (a 512x512 viewBox, chevron
+     group translated to 106,116) scaled down by 108/512 to fit this
+     icon's 108x108 viewport, keeping the same proportions. Flat square
+     background rather than a rounded-rect: this project doesn't use the
+     full adaptive-icon (foreground/background layer) system, and most
+     launchers apply their own icon mask on top of this anyway — the
+     background just needs to be filled, not pre-rounded. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#0C0C0E" android:pathData="M0,0h108v108h-108z" />
+    <group android:translateX="22.36" android:translateY="24.46">
+        <!-- Outer, dimmer chevron -->
+        <path
+            android:strokeColor="#F5F5F7"
+            android:strokeAlpha="0.35"
+            android:strokeWidth="3"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M4.2,12.6 L31.6,67.5 L59.1,12.6" />
+        <!-- Inner, solid chevron -->
+        <path
+            android:strokeColor="#F5F5F7"
+            android:strokeWidth="3.8"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M12.6,12.6 L31.6,52.7 L50.6,12.6" />
+        <!-- Horizon beam -->
+        <path
+            android:strokeColor="#F5F5F7"
+            android:strokeAlpha="0.8"
+            android:strokeWidth="2.1"
+            android:strokeLineCap="round"
+            android:pathData="M20,27.4 L43.2,27.4" />
+    </group>
+</vector>

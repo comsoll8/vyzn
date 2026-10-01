@@ -1,0 +1,59 @@
+## VYZN — install from the published image (no build step)
+#
+# Use this instead of docker-compose.yml when you're installing VYZN on a
+# *new* Unraid box rather than developing it — e.g. setting it up for a
+# friend. There's no `build:` step, so Docker just pulls the already-built
+# image from GitHub Container Registry; nothing here needs the project's
+# source code at all.
+#
+# Setup:
+#   1. Copy this file to your Unraid appdata share as docker-compose.yml
+#      (or add it as a new Docker Compose stack in the Unraid UI).
+#   2. Edit the two `volumes:` paths below to point at your own media
+#      and appdata locations, and the TZ value if it matters to you.
+#   3. `docker compose up -d`.
+#   4. Open the server (http://<your-unraid-ip>:18080) and finish setup
+#      from Control Center > Settings: TMDB, Seerr (optional), hardware
+#      transcoding, and Tailscale (optional, for remote access) are all
+#      entered there, in the UI — nothing else to edit in this file for
+#      that part.
+#   5. Later, "Check for Updates" in that same Settings page tells you
+#      when a newer image is out; installing it is just:
+#        docker compose pull && docker compose up -d
+#
+# This file intentionally matches docker-compose.yml's env vars/volumes/
+# devices — the only structural difference is `image:` instead of
+# `build:`. Keep the two in sync if either one changes.
+
+services:
+  media-server:
+    image: ghcr.io/comsoll8/vyzn:latest   # pin to a version (e.g. :0.3.0) instead of :latest if you'd rather update on your own schedule
+    container_name: media-server
+    restart: unless-stopped
+    ports:
+      - "18080:8080"
+    environment:
+      - PUID=99
+      - PGID=100
+      - TZ=America/New_York       # <-- set your timezone (see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
+      - MEDIA_DIR=/media
+      - DATA_DIR=/config
+      - TRANSCODE_DIR=/transcode
+      - HW_TRANSCODE=false        # flip on from Control Center > Settings once you've confirmed your hardware supports it, or set true here
+      - LIBVA_DRIVER_NAME=iHD     # use "i965" instead on pre-Broadwell Intel CPUs
+      # Everything else — TMDB_API_KEY, SEERR_URL/SEERR_API_KEY,
+      # TAILSCALE_AUTHKEY, VAAPI_DEVICE — is left unset here on purpose.
+      # Enter them from Control Center > Settings after first launch;
+      # they're saved to this server's own database, not to this file,
+      # and take effect immediately with no restart. See src/config.js
+      # in the source repo if you want the details.
+    volumes:
+      - /mnt/user/appdata/media-server:/config
+      - /mnt/user/Media:/media:ro
+      - /mnt/user/appdata/media-server/transcode:/transcode
+      - /mnt/user/appdata/media-server/theme-music:/app/public/theme-music
+    devices:
+      - /dev/dri:/dev/dri          # Intel QuickSync passthrough — remove this line if your box has no Intel iGPU
+      - /dev/net/tun:/dev/net/tun  # Tailscale — lets the container create its own VPN network interface
+    cap_add:
+      - NET_ADMIN                  # Tailscale — required alongside /dev/net/tun above

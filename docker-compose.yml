@@ -1,0 +1,46 @@
+services:
+  media-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: media-server
+    restart: unless-stopped
+    ports:
+      - "18080:8080"
+    environment:
+      - PUID=99
+      - PGID=100
+      - TZ=Australia/Adelaide
+      - MEDIA_DIR=/media
+      - DATA_DIR=/config
+      - TRANSCODE_DIR=/transcode
+      - HW_TRANSCODE=true          # set false to fall back to CPU (libx264)
+      - LIBVA_DRIVER_NAME=iHD      # use "i965" instead on pre-Broadwell Intel CPUs
+      - SCAN_ONLY_DIRS=Movies,TvShows   # only these top-level folders under MEDIA_DIR are scanned
+      - SCAN_PROBE_CONCURRENCY=4        # parallel ffprobe processes (CPU-bound; ~core count)
+      - SCAN_TMDB_CONCURRENCY=15        # parallel TMDB lookups (network-bound; safe to raise for big libraries)
+      # TMDB_API_KEY, TMDB_AUTH_TOKEN, SEERR_URL, SEERR_API_KEY, and
+      # TAILSCALE_AUTHKEY can all be left unset here and entered instead
+      # from Control Center > Settings once the app is running — handy for
+      # a fresh install someone else will configure entirely through the
+      # UI. Anything set here is just the starting default; a value saved
+      # from Settings overrides it without needing a restart. See
+      # src/config.js.
+      - TMDB_API_KEY=              # <-- put your TMDB v3 API key here (short one, not the eyJ... token)
+      # - TMDB_AUTH_TOKEN=         # <-- use this instead if you have the long eyJ... read access token
+    volumes:
+      - /mnt/user/appdata/media-server:/config
+      - /mnt/user/Media:/media:ro
+      - /mnt/user/appdata/media-server/transcode:/transcode
+      # Optional: drop a show's theme song in here as {tmdb_id}.mp3 (e.g.
+      # 1396.mp3 for Breaking Bad) and the Show Detail page plays it
+      # automatically. Mounted as its own volume so files placed here
+      # survive `docker compose up --build` — public/ itself is baked into
+      # the image and would otherwise wipe out anything dropped straight
+      # into the container.
+      - /mnt/user/appdata/media-server/theme-music:/app/public/theme-music
+    devices:
+      - /dev/dri:/dev/dri          # Intel QuickSync passthrough
+      - /dev/net/tun:/dev/net/tun  # Tailscale — lets the container create its own VPN network interface
+    cap_add:
+      - NET_ADMIN                  # Tailscale — required alongside /dev/net/tun above

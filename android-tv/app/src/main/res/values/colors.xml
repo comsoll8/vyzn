@@ -1,0 +1,17 @@
+<resources>
+    <!-- Matches public/style.css's root color variables (bg, bg elevated,
+         text, text dim, accent) so the native splash/error screens don't
+         jar against the web content loaded into the WebView. This had
+         drifted from the web palette (a blue #6C8CFF accent, a
+         #14151A/#1E2027 bg pair) left over from an earlier iteration:
+         style.css has since moved to the monochrome "Abyss" theme
+         (near-white accent used only as a fill, never a text color),
+         which is also what the new logo (vyzn-mark/vyzn-logo) is drawn
+         in, so this needed to catch up for the native chrome (status bar,
+         nav bar, button tinting) to actually match it. -->
+    <color name="vyzn_bg">#121212</color>
+    <color name="vyzn_bg_elevated">#2A2A2A</color>
+    <color name="vyzn_text">#EAEAF0</color>
+    <color name="vyzn_text_dim">#9A9BA8</color>
+    <color name="vyzn_accent">#F5F5F7</color>
+</resources>
