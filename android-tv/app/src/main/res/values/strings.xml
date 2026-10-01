@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">VYZN</string>
+    <string name="server_url_title">Connect to your VYZN server</string>
+    <string name="server_url_hint">http://192.168.1.x:8080</string>
+    <string name="server_url_message">Enter the address of your VYZN media server, including the port. You can find this in your router or in the Unraid Docker container\'s port mapping.</string>
+    <string name="server_url_connect">Connect</string>
+    <string name="server_url_invalid">Enter a full address starting with http:// or https://</string>
+    <string name="load_error_title">Can\'t reach that server</string>
+    <string name="load_error_message">Check that the address is correct and that this device is on the same network as your VYZN server.</string>
+    <string name="load_error_retry">Retry</string>
+    <string name="load_error_change_server">Change Server</string>
+    <string name="change_server_hint">Long-press Back at any time to change the server address.</string>
+</resources>

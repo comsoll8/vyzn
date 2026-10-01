@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Real Android TV launcher-row banner (required 320x180dp), redrawn from
+     media-server/public/assets/vyzn-logo.svg (the wordmark: chevron mark +
+     "VYZN") as nested VectorDrawable groups — same technique as
+     ic_launcher.xml, and for the same reason (crisp at any density, no PNG
+     export step). The source SVG's "v0.2" accent subtext is dropped: it's
+     real SVG <text>, and VectorDrawable has no text element to translate
+     it into, so reproducing it here would mean rasterizing to a PNG
+     instead — not worth it for a version accent on what's otherwise a
+     clean vector asset. The mark+wordmark group keeps its original
+     internal layout (the same nested translate(6,7)/translate(68,16)
+     structure as the source SVG); only the outer group scales and
+     centers that combined shape within the 320x180 banner. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path android:fillColor="#0C0C0E" android:pathData="M0,0h320v180h-320z" />
+
+    <group
+        android:scaleX="1.579"
+        android:scaleY="1.579"
+        android:pivotX="0"
+        android:pivotY="0"
+        android:translateX="27.37"
+        android:translateY="42.61">
+
+        <!-- Aperture mark (same as ic_launcher.xml's chevron, at its
+             original source size/position — the outer group above is what
+             scales it to fit the banner). -->
+        <group android:translateX="6" android:translateY="7">
+            <path
+                android:strokeColor="#F5F5F7"
+                android:strokeAlpha="0.4"
+                android:strokeWidth="2"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round"
+                android:pathData="M2,8 L22,38 L42,8" />
+            <path
+                android:strokeColor="#F5F5F7"
+                android:strokeWidth="2.5"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round"
+                android:pathData="M8,8 L22,30 L36,8" />
+            <path
+                android:strokeColor="#F5F5F7"
+                android:strokeAlpha="0.8"
+                android:strokeWidth="1.5"
+                android:strokeLineCap="round"
+                android:pathData="M14,18 L30,18" />
+        </group>
+
+        <!-- "VYZN" wordmark glyphs (hand-drawn fill paths in the source
+             SVG, not real text, so these translate over exactly). -->
+        <group android:translateX="68" android:translateY="16">
+            <path android:fillColor="#F5F5F7" android:pathData="M0,0 L2,0 L10,18 L18,0 L20,0 L11,20 L9,20 Z" />
+            <path android:fillColor="#F5F5F7" android:pathData="M26,0 L28,0 L35,10 L42,0 L44,0 L36,11 L36,20 L34,20 L34,11 Z" />
+            <path android:fillColor="#F5F5F7" android:pathData="M50,0 L68,0 L68,2 L53,18 L68.5,18 L68.5,20 L50,20 L50,18 L65,2 L50,2 Z" />
+            <path android:fillColor="#F5F5F7" android:pathData="M74,0 L76,0 L90,16.5 L90,0 L92,0 L92,20 L90,20 L76,3.5 L76,20 L74,20 Z" />
+        </group>
+    </group>
+</vector>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- VYZN is self-hosted on a LAN and almost certainly served over plain
+     http:// (no reverse proxy / TLS cert), which Android blocks by default
+     for apps targeting modern API levels. This explicitly allows cleartext
+     traffic to any host — fine for a personal app talking to your own
+     network only, not something you'd want in anything public-facing. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

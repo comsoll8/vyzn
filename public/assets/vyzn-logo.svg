@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 50" width="100%" height="100%" fill="none">
+  <!-- Minimalist Thin Aperture Mark -->
+  <g transform="translate(6, 7)" stroke="#F5F5F7" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Outer Precision Light Chevron -->
+    <path d="M 2 8 L 22 38 L 42 8" stroke-width="2" opacity="0.4" />
+    <!-- Inner Core Razor V -->
+    <path d="M 8 8 L 22 30 L 36 8" stroke-width="2.5" />
+    <!-- Focal Horizon Beam -->
+    <line x1="14" y1="18" x2="30" y2="18" stroke-width="1.5" opacity="0.8" />
+  </g>
+
+  <!-- Futuristic Wide-Tracked Wordmark -->
+  <g fill="#F5F5F7" transform="translate(68, 16)">
+    <!-- V -->
+    <path d="M 0 0 L 2 0 L 10 18 L 18 0 L 20 0 L 11 20 L 9 20 Z" />
+    <!-- Y -->
+    <path d="M 26 0 L 28 0 L 35 10 L 42 0 L 44 0 L 36 11 L 36 20 L 34 20 L 34 11 Z" />
+    <!-- Z -->
+    <path d="M 50 0 L 68 0 L 68 2 L 53 18 L 68.5 18 L 68.5 20 L 50 20 L 50 18 L 65 2 L 50 2 Z" />
+    <!-- N -->
+    <path d="M 74 0 L 76 0 L 90 16.5 L 90 0 L 92 0 L 92 20 L 90 20 L 76 3.5 L 76 20 L 74 20 Z" />
+  </g>
+
+  <!-- Accent Subtext -->
+  <text x="175" y="31" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif" font-size="8" font-weight="400" letter-spacing="3" fill="#8E8E93">v0.2</text>
+</svg>

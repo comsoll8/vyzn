@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VYZN</title>
+  <!-- Runs synchronously, before style.css even finishes loading, so the
+       .tv-app class (which turns off backdrop-filter blur — see that rule
+       in style.css for why) is already present for first paint, not added
+       a moment late and causing a flash of the slow blurred version. The
+       "VyznTV" marker is appended to the WebView's own user agent string
+       in vyzn-tv's MainActivity.kt (configureWebView()) — nothing else
+       sends a user agent containing that string, so this only ever
+       matches the Android TV wrapper app, never a desktop/mobile browser. -->
+  <script>
+    if (navigator.userAgent.indexOf('VyznTV') !== -1) {
+      document.documentElement.classList.add('tv-app');
+    }
+  </script>
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="48x48" href="/assets/favicon-48.png" />
+  <link rel="apple-touch-icon" href="/assets/favicon-256.png" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+  <!-- Profile picker: shown until a profile is chosen (stored in localStorage) -->
+  <div id="profileGate" class="profile-gate hidden">
+    <img src="/assets/vyzn-logo.svg" alt="VYZN" class="gate-logo" />
+    <h1>Who's watching?</h1>
+    <div id="profileList" class="profile-list"></div>
+    <form id="newProfileForm" class="new-profile-form">
+      <input id="newProfileName" type="text" placeholder="New profile name" autocomplete="off" required />
+      <label class="child-check"><input id="newProfileChild" type="checkbox" /> Kids profile</label>
+      <button type="submit">Add profile</button>
+    </form>
+  </div>
+
+  <div id="app" class="app hidden">
+    <!-- Everything that should stay pinned to the top of the viewport lives
+         in one sticky wrapper, so it always stacks correctly as one unit —
+         however tall the topbar happens to render (it wraps to 2+ lines on
+         narrow/portrait screens), without a hardcoded pixel offset between
+         pieces getting out of sync. -->
+    <div class="app-nav">
+      <div id="scan-progress-bar" class="scan-progress-bar hidden">
+        <div id="scanProgressFill" class="scan-progress-fill"></div>
+        <span id="scanProgressText" class="scan-progress-text"></span>
+      </div>
+
+      <header class="topbar">
+        <button id="navMenuBtn" class="hamburger-btn" type="button" aria-label="Menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+        <img src="/assets/vyzn-mark.svg" alt="VYZN" class="topbar-logo" />
+        <div class="topbar-spacer"></div>
+
+        <!-- Genre quick-filter: collapsed into a single floating pill next
+             to the other topbar icon buttons instead of its own full-width
+             bar underneath. Clicking it drops down the genre list (built by
+             renderGenrePills in app.js); picking one smooth-scrolls to that
+             genre's shelf below and closes the dropdown. Hidden outside the
+             Home tab (toggled in render()), same as the old bar was. -->
+        <button id="genreFilterBtn" class="genre-filter-btn hidden" type="button" aria-haspopup="true" aria-expanded="false">
+          <span id="genreFilterLabel">All Genres</span><span class="genre-filter-caret">▾</span>
+        </button>
+        <nav id="genrePills" class="genre-pills hidden"></nav>
+
+        <button id="appSwitcherBtn" class="icon-btn" title="Active Streams" aria-label="Active Streams">▤</button>
+        <button id="controlCenterBtn" class="profile-btn" title="Control Center">
+          <span id="activeProfileName"></span>
+        </button>
+
+        <!-- Collapsible nav menu (Apple-style hamburger dropdown): Home/
+             Movies/TV Shows and Search sit directly in the topbar at once —
+             this tucks them behind one button so the bar itself stays
+             quiet, and only opens the drawer when you actually want to
+             navigate. Settings and Scan Library used to live here too, but
+             they're actions on the server, not navigation, so they moved to
+             Control Center (the profile-avatar panel) instead — see its
+             Quick Actions section. Nested inside the topbar (rather than a
+             sibling) so it can anchor right under it with plain
+             `position: absolute; top: 100%`. -->
+        <nav id="navMenu" class="nav-menu hidden">
+          <div class="nav-menu-tabs">
+            <button class="tab-btn active" data-tab="home">Home</button>
+            <button class="tab-btn" data-tab="movies">Movies</button>
+            <button class="tab-btn" data-tab="tv">TV Shows</button>
+          </div>
+          <input id="search" type="search" placeholder="Search title..." autocomplete="off" />
+        </nav>
+      </header>
+      <div id="navMenuScrim" class="nav-menu-scrim hidden"></div>
+    </div>
+
+    <!-- Hero spotlight header: shown on the Home tab only -->
+    <section id="hero" class="hero hidden">
+      <div class="hero-backdrop"></div>
+      <div class="hero-scrim"></div>
+      <div class="hero-content" tabindex="0" role="button">
+        <h2 id="heroTitle"></h2>
+        <div class="hero-meta">
+          <span id="heroRating" class="rating-badge"></span>
+          <span id="heroYear"></span>
+          <span id="heroDuration"></span>
+        </div>
+        <p id="heroOverview"></p>
+      </div>
+    </section>
+
+    <main id="rows" class="rows">
+      <p class="empty-state">Loading library...</p>
+    </main>
+
+    <main id="grid" class="grid hidden"></main>
+  </div>
+
+  <!-- Show detail: Apple-TV-style full-page detail, mirroring #movieDetail
+       below (hero backdrop, meta row, genre pills, overview) with a season
+       tab bar + episode list, cast carousel and "More Like This" shelf
+       underneath instead of a cast-carousel-only movie layout. -->
+  <button id="showDetailBack" class="back-btn hidden">← Back to TV Shows</button>
+  <div id="showDetail" class="movie-detail-overlay hidden">
+    <div class="movie-detail-hero">
+      <div id="showDetailBackdrop" class="movie-detail-backdrop"></div>
+      <div class="movie-detail-scrim"></div>
+      <div class="movie-detail-header">
+        <h2 id="showDetailTitle"></h2>
+        <div class="movie-detail-meta">
+          <span id="showDetailRating" class="rating-badge"></span>
+          <span id="showDetailYearRange"></span>
+          <span id="showDetailSeasonCount"></span>
+          <span id="showDetailTmdbScore" class="score-badge hidden"></span>
+        </div>
+        <div id="showDetailGenres" class="genre-tag-list"></div>
+        <p id="showDetailOverview" class="movie-detail-overview"></p>
+        <p id="showDetailCreators" class="movie-detail-crew"></p>
+        <div class="movie-detail-actions">
+          <button id="showDetailPlayBtn" class="btn-primary">▶ Play</button>
+          <button id="showDetailWatchlistBtn" class="btn-icon" type="button" title="Add to Watchlist" aria-pressed="false">
+            <span class="btn-icon-glyph">🔖</span>
+          </button>
+          <button id="showDetailTrailerBtn" class="btn-icon hidden" type="button" title="Watch Trailer">
+            <span class="btn-icon-glyph">🎬</span>
+          </button>
+          <button id="showDetailThemeToggleBtn" class="btn-secondary theme-toggle-btn" type="button" aria-label="Mute theme music" title="Theme music">🔊</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="show-detail-body">
+      <div id="seasonTabs" class="season-tabs"></div>
+      <div id="episodeList" class="episode-list"></div>
+    </div>
+
+    <section id="showDetailCastShelf" class="shelf hidden">
+      <h3>Cast</h3>
+      <div id="showDetailCastTrack" class="shelf-track cast-track"></div>
+    </section>
+
+    <section id="showDetailSimilarShelf" class="shelf hidden">
+      <h3>More Like This</h3>
+      <div id="showDetailSimilarTrack" class="shelf-track"></div>
+    </section>
+  </div>
+
+  <!-- Settings: library sync actions, profile management, system info -->
+  <div id="settingsOverlay" class="show-detail-overlay hidden">
+    <div class="show-detail-box settings-box">
+      <button id="closeSettings" class="close-btn" aria-label="Close">&times;</button>
+      <h2>Settings</h2>
+
+      <section class="settings-section">
+        <h3>Library</h3>
+        <div class="settings-actions">
+          <button id="settingsScanBtn" class="btn-secondary">Scan Library</button>
+          <button id="settingsRetryBtn" class="btn-secondary">Retry Unmatched</button>
+          <button id="settingsBackfillGenresBtn" class="btn-secondary">Backfill Genres</button>
+        </div>
+        <p class="settings-hint">Backfill Genres re-fetches genre tags for movies/shows that were already matched before genre shelves existed — it doesn't touch titles, posters or anything else.</p>
+        <div id="settingsScanInfo" class="settings-info"></div>
+
+        <div class="settings-subrow">
+          <input id="purgeInput" type="text" placeholder="Path contains e.g. /.Trash- or /Downloads/" autocomplete="off" />
+          <button id="purgeBtn" class="btn-secondary">Purge matching</button>
+        </div>
+
+        <div class="settings-subrow danger-row">
+          <span>Wipe the entire library (metadata only — files on disk are untouched)</span>
+          <button id="wipeLibraryBtn" class="btn-danger">Wipe library</button>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Unmatched items <span id="unmatchedCount" class="count-badge"></span></h3>
+        <p class="settings-hint">Items with no TMDB match yet. Adjust the search title or media type and retry, or purge a file that shouldn't be in the library at all.</p>
+        <div id="unmatchedList" class="unmatched-list"></div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Profiles</h3>
+        <div id="settingsProfileList" class="settings-profile-list"></div>
+        <form id="settingsAddProfileForm" class="new-profile-form settings-add-profile">
+          <input id="settingsNewProfileName" type="text" placeholder="New profile name" autocomplete="off" required />
+          <label class="child-check"><input id="settingsNewProfileChild" type="checkbox" /> Kids profile</label>
+          <button type="submit" class="btn-secondary">Add profile</button>
+        </form>
+      </section>
+
+      <section class="settings-section">
+        <h3>Playback</h3>
+        <label class="audio-pref-field">
+          Preferred audio language
+          <select id="settingsAudioPrefSelect">
+            <option value="">No preference (file default)</option>
+            <option value="eng">English</option>
+            <option value="jpn">Japanese</option>
+            <option value="spa">Spanish</option>
+            <option value="fre">French</option>
+            <option value="ger">German</option>
+            <option value="kor">Korean</option>
+            <option value="zho">Chinese</option>
+          </select>
+        </label>
+        <p class="settings-hint">Used to auto-pick a track when a title has more than one audio language available — you can always override it per-title from the player's audio track button.</p>
+      </section>
+
+      <section class="settings-section">
+        <h3>System info</h3>
+        <dl id="settingsSystemInfo" class="settings-system-info"></dl>
+        <!-- A plain download link, not a fetch()+blob button — this works
+             even if something in app.js itself is broken, which is exactly
+             the situation this exists for (grabbing a log to diagnose why
+             something isn't loading). -->
+        <a id="downloadLogBtn" class="btn-secondary" href="/api/logs/download" download>⬇ Download Server Log</a>
+        <div class="settings-actions" style="margin-top: 10px;">
+          <button id="checkUpdateBtn" class="btn-secondary">Check for Updates</button>
+        </div>
+        <div id="checkUpdateStatus" class="settings-info"></div>
+      </section>
+
+      <!-- Editable config (TMDB/Seerr/transcode) — saved to the server's
+           own DB via PUT /api/settings/config, no docker-compose.yml edit
+           or restart needed. This is what makes a fresh install
+           self-configurable entirely through the UI. -->
+      <section class="settings-section">
+        <h3>Connections</h3>
+        <p class="settings-hint">These override whatever's set in docker-compose.yml, and take effect immediately — no restart needed. A friend setting up their own VYZN can leave docker-compose.yml untouched and configure everything from here.</p>
+        <form id="configForm" class="config-form"></form>
+        <div class="settings-actions">
+          <button id="configSaveBtn" class="btn-primary" type="submit" form="configForm">Save Connections</button>
+        </div>
+        <div id="configSaveStatus" class="settings-info"></div>
+      </section>
+
+      <!-- Tailscale: remote access without port-forwarding. Status is
+           polled on open; Connect shells out to `tailscale up` inside the
+           container (src/tailscale.js). -->
+      <section class="settings-section">
+        <h3>Remote Access (Tailscale)</h3>
+        <p class="settings-hint">Installs VYZN onto your private Tailscale network so you can reach it from outside your home, with no port-forwarding. Get an auth key from the <a href="https://login.tailscale.com/admin/settings/keys" target="_blank" rel="noopener">Tailscale admin console</a>, paste it below, and connect.</p>
+        <div id="tailscaleStatus" class="settings-info"></div>
+        <div id="tailscaleConnectRow" class="settings-subrow">
+          <input id="tailscaleAuthKeyInput" type="password" placeholder="tskey-auth-..." autocomplete="off" />
+          <button id="tailscaleConnectBtn" class="btn-secondary">Connect</button>
+        </div>
+        <div class="settings-actions">
+          <button id="tailscaleDisconnectBtn" class="btn-secondary hidden">Disconnect</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Control Center: right-side slide-out panel (profile switcher, quick
+       actions), opened from the profile avatar button in the top-right. -->
+  <div id="controlCenterScrim" class="control-center-scrim hidden"></div>
+  <aside id="controlCenter" class="control-center hidden">
+    <button id="closeControlCenter" class="close-btn" aria-label="Close">&times;</button>
+    <h2>Control Center</h2>
+
+    <section class="cc-section">
+      <h3>Switch Profile</h3>
+      <div id="ccProfileList" class="cc-profile-list"></div>
+      <button id="ccSwitchToGateBtn" class="btn-secondary cc-full-btn">All Profiles / Sign Out</button>
+    </section>
+
+    <section class="cc-section">
+      <h3>Quick Actions</h3>
+      <div class="cc-quick-actions">
+        <button id="ccRescanBtn" class="btn-secondary">↻ Scan Library</button>
+        <button id="ccSystemInfoBtn" class="btn-secondary">ⓘ System Info</button>
+        <button id="ccSettingsBtn" class="btn-secondary">⚙ Settings</button>
+      </div>
+      <div id="ccScanInfo" class="settings-info"></div>
+
+      <div id="ccSystemInfoPanel" class="cc-subpanel hidden">
+        <dl id="ccSystemInfo" class="settings-system-info"></dl>
+      </div>
+    </section>
+  </aside>
+
+  <!-- Trailer modal: shared by both Movie Detail and Show Detail's "Watch
+       Trailer" button — a YouTube embed over a dimmed backdrop rather than
+       sending the person out to a new tab, to match the rest of the app. -->
+  <div id="trailerModal" class="trailer-modal hidden">
+    <div class="trailer-modal-backdrop"></div>
+    <div class="trailer-modal-box">
+      <button id="trailerModalCloseBtn" class="trailer-modal-close" type="button" aria-label="Close trailer">✕</button>
+      <div class="trailer-modal-frame-wrap">
+        <iframe id="trailerModalFrame" class="trailer-modal-frame" src="" title="Trailer" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- App switcher: active transcode sessions as floating tiles, closable
+       per-tile (stops that transcode) — the tvOS multitasking-view analog
+       for "what's currently streaming on this server". -->
+  <div id="appSwitcherOverlay" class="app-switcher-overlay hidden">
+    <div class="app-switcher-header">
+      <h2>Active Streams</h2>
+      <button id="closeAppSwitcher" class="close-btn" aria-label="Close">&times;</button>
+    </div>
+    <div id="appSwitcherTrack" class="app-switcher-track"></div>
+  </div>
+
+  <!-- Movie detail: Apple-TV-style full-page detail with cast + similar -->
+  <button id="movieDetailBack" class="back-btn hidden">← Back to Movies</button>
+  <div id="movieDetail" class="movie-detail-overlay hidden">
+    <div class="movie-detail-hero">
+      <div class="movie-detail-backdrop"></div>
+      <div class="movie-detail-scrim"></div>
+      <div class="movie-detail-header">
+        <h2 id="movieDetailTitle"></h2>
+        <div class="movie-detail-meta">
+          <span id="movieDetailRating" class="rating-badge"></span>
+          <span id="movieDetailYear"></span>
+          <span id="movieDetailRuntime"></span>
+          <span id="movieDetailTmdbScore" class="score-badge hidden"></span>
+        </div>
+        <div id="movieDetailGenres" class="genre-tag-list"></div>
+        <p id="movieDetailOverview" class="movie-detail-overview"></p>
+        <p id="movieDetailCrew" class="movie-detail-crew"></p>
+
+        <!-- Video/Audio/Subtitles info, filled from the scanned file's own
+             ffprobe data (resolution/codec/audio_tracks/subtitle_tracks) —
+             hidden until openMovieDetail has something to show. -->
+        <div id="movieDetailInfoGrid" class="detail-info-grid hidden">
+          <div class="detail-info-row"><span class="detail-info-label">Video</span><span id="movieDetailVideoInfo" class="detail-info-value"></span></div>
+          <div class="detail-info-row"><span class="detail-info-label">Audio</span><span id="movieDetailAudioInfo" class="detail-info-value"></span></div>
+          <div class="detail-info-row"><span class="detail-info-label">Subtitles</span><span id="movieDetailSubtitleInfo" class="detail-info-value"></span></div>
+        </div>
+
+        <div class="movie-detail-actions">
+          <button id="movieDetailPlayBtn" class="btn-primary">▶ Play</button>
+          <button id="movieDetailWatchlistBtn" class="btn-icon" type="button" title="Add to Watchlist" aria-pressed="false">
+            <span class="btn-icon-glyph">🔖</span>
+          </button>
+          <button id="movieDetailTrailerBtn" class="btn-icon hidden" type="button" title="Watch Trailer">
+            <span class="btn-icon-glyph">🎬</span>
+          </button>
+          <button id="movieDetailWatchedBtn" class="btn-icon" type="button" title="Mark as Watched" aria-pressed="false">
+            <span class="btn-icon-glyph">✓</span>
+          </button>
+          <button id="movieDetailEditMatchBtn" class="btn-icon" type="button" title="Fix an incorrect TMDB match">
+            <span class="btn-icon-glyph">✎</span>
+          </button>
+          <!-- Only shown when this item has saved, in-progress Continue
+               Watching progress (toggled in openMovieDetail) — fully
+               watched/unwatched is handled by the checkmark button above. -->
+          <div class="detail-menu-wrap">
+            <button id="movieDetailMenuBtn" class="btn-secondary detail-menu-btn hidden" type="button" aria-label="More actions" aria-expanded="false">⋯</button>
+            <div id="movieDetailMenu" class="detail-menu hidden">
+              <button id="movieDetailRestartBtn" type="button" class="hidden">↻ Restart from Beginning</button>
+              <button id="movieDetailRemoveProgressBtn" type="button" class="hidden">✕ Remove from Continue Watching</button>
+            </div>
+          </div>
+        </div>
+        <div id="movieDetailProgressWrap" class="detail-progress-wrap hidden">
+          <div class="detail-progress-bar"><div id="movieDetailProgressFill" class="detail-progress-fill"></div></div>
+        </div>
+
+        <!-- Hidden until the pencil icon is clicked: lets you re-search TMDB
+             with a corrected title/type when the auto-match on a messy
+             filename got it wrong, without needing to go into Settings. -->
+        <div id="movieDetailEditMatchPanel" class="edit-match-panel hidden">
+          <input id="movieDetailEditMatchTitle" type="text" placeholder="Search title..." />
+          <select id="movieDetailEditMatchType">
+            <option value="movie">Movie</option>
+            <option value="tv">TV Show</option>
+          </select>
+          <button id="movieDetailEditMatchSubmit" class="btn-secondary">Search &amp; Update</button>
+          <button id="movieDetailEditMatchCancel" class="btn-secondary">Cancel</button>
+          <p id="movieDetailEditMatchStatus" class="unmatched-status"></p>
+        </div>
+      </div>
+    </div>
+
+    <section id="movieDetailCastShelf" class="shelf hidden">
+      <h3>Cast</h3>
+      <div id="movieDetailCastTrack" class="shelf-track cast-track"></div>
+    </section>
+
+    <section id="movieDetailSimilarShelf" class="shelf hidden">
+      <h3>More Like This</h3>
+      <div id="movieDetailSimilarTrack" class="shelf-track"></div>
+    </section>
+  </div>
+
+  <div id="player" class="player-overlay hidden">
+    <div class="player-box">
+      <button id="closePlayer" class="close-btn" aria-label="Close">&times;</button>
+      <div id="videoWrap" class="video-wrap">
+        <video id="video" autoplay>
+          <track id="videoSubtitleTrack" kind="subtitles" label="Subtitles" />
+        </video>
+
+        <!-- Covers the video element the entire time it has nothing to show
+             yet — stream startup (server transcode spinning up), and any
+             mid-playback buffering stall. Without this, the WebView/
+             browser's own bare default (a plain gray box with a native
+             play icon) shows through instead, which is what looked broken/
+             unstyled. Two visual states via .player-loading--error:
+             normal is a spinner + status line, error swaps in a message
+             and Retry/Close so a failed start doesn't fall back to a
+             native alert() dialog. -->
+        <div id="playerLoading" class="player-loading hidden">
+          <div class="player-loading-spinner"></div>
+          <p id="playerLoadingText" class="player-loading-text">Starting stream…</p>
+          <div id="playerLoadingActions" class="player-loading-actions hidden">
+            <button id="playerLoadingRetryBtn" class="btn-primary">Try Again</button>
+            <button id="playerLoadingCloseBtn" class="btn-secondary">Close</button>
+          </div>
+        </div>
+
+        <!-- Minimalist custom scrubber bar, replacing the browser's native
+             video controls: timeline, elapsed/remaining time, play/pause,
+             "Instant Replay" (-15s + auto-captions), audio track picker,
+             subtitle toggle, volume, fullscreen. -->
+        <div id="playerControls" class="player-controls">
+          <div class="player-scrub-row">
+            <span id="playerCurrentTime" class="player-time">0:00</span>
+            <input id="playerSeek" class="player-seek" type="range" min="0" max="100" value="0" step="0.1" />
+            <span id="playerRemainingTime" class="player-time">-0:00</span>
+          </div>
+          <!-- Deliberately one contiguous, left-aligned row with no gap-
+               filling spacer between groups (there used to be one pushing
+               Audio/Subtitle/Volume/Fullscreen to the far right edge) — a
+               wide gap between buttons let the seek bar above (which spans
+               the row's full width) end up geometrically "closer" than the
+               next button, so D-pad Left/Right would detour up through the
+               seek bar instead of moving along this row. Volume is gone
+               entirely: a TV remote's own hardware volume keys (and the
+               desktop/mobile OS volume control) already cover it, so a
+               dedicated on-screen control was redundant. -->
+          <div class="player-actions-row">
+            <button id="playerPlayPauseBtn" class="player-icon-btn" title="Play/Pause">⏸</button>
+            <button id="playerReplayBtn" class="player-icon-btn player-replay-btn" title="What did they say? (-15s, captions on)">
+              ↺15 <span class="player-replay-cc">CC</span>
+            </button>
+            <select id="playerAudioSelect" class="player-track-select hidden" title="Audio track"></select>
+            <button id="playerSubtitleBtn" class="player-icon-btn hidden" title="Subtitles">CC</button>
+            <button id="playerFullscreenBtn" class="player-icon-btn" title="Fullscreen">⛶</button>
+          </div>
+        </div>
+
+        <!-- "Up Next" — shown for the last ~15s of a TV episode when
+             another episode follows it. Countdown auto-advances; Play Now
+             skips straight there; Cancel dismisses it and just lets the
+             episode finish normally. -->
+        <div id="upNextOverlay" class="up-next-overlay hidden" role="dialog" aria-label="Up next">
+          <button id="upNextCancelBtn" class="up-next-cancel" aria-label="Cancel">&times;</button>
+          <div class="up-next-thumb"><img id="upNextThumb" alt="" /></div>
+          <div class="up-next-info">
+            <p class="up-next-label">Up Next</p>
+            <p id="upNextTitle" class="up-next-title"></p>
+            <p id="upNextCountdown" class="up-next-countdown"></p>
+          </div>
+          <button id="upNextPlayBtn" class="btn-primary up-next-play-btn">▶ Play Now</button>
+        </div>
+
+        <!-- End-of-playback recommendations — a movie finished, or a show
+             just ran out of episodes. Up to 5 titles to jump straight
+             into, reusing the same poster/show card components as the
+             rest of the app. -->
+        <div id="recsOverlay" class="recs-overlay hidden" role="dialog" aria-label="What to watch next">
+          <div class="recs-content">
+            <p id="recsHeading" class="recs-heading">What's next?</p>
+            <div id="recsGrid" class="recs-grid"></div>
+            <button id="recsCloseBtn" class="btn-secondary">Close</button>
+          </div>
+        </div>
+      </div>
+      <div class="player-meta">
+        <h2 id="playerTitle"></h2>
+        <p id="playerOverview"></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
