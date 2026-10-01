@@ -15,3 +15,9 @@ android-tv/.idea/
 android-tv/*.iml
 android-tv/captures/
 android-tv/.cxx/
+# The actual release signing key + its credentials — never commit these.
+# See android-tv/README.md's "Signing a release build" section for how
+# to generate keystore.properties and the .jks it points at.
+android-tv/keystore.properties
+android-tv/*.jks
+android-tv/*.keystore

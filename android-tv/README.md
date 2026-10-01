@@ -71,18 +71,68 @@ vyzn-tv/
    Kotlin 1.9.22 / compileSdk 34, which any 2024+ release of Android Studio
    handles out of the box) and JDK 17 (Android Studio bundles its own, so
    you usually don't need to install this separately).
-2. **Open the project**: `File > Open`, select the `vyzn-tv` folder.
+2. **Open the project**: `File > Open`, select the `android-tv` folder
+   (this now lives as a subfolder of the main `vyzn` repo, alongside the
+   server — `git clone https://github.com/comsoll8/vyzn` and open
+   `vyzn/android-tv`, not a standalone `vyzn-tv` checkout).
 3. Android Studio will sync Gradle automatically. Note: the Gradle wrapper
    scripts (`gradlew` / `gradlew.bat`) and wrapper JAR aren't included in
    this delivery — I had no network access to fetch the wrapper JAR from
    here. Android Studio regenerates these automatically the first time you
    open the project (it'll prompt you, or just work silently). If you'd
    rather build from the command line, run `gradle wrapper` once from the
-   `vyzn-tv` folder using any system-installed Gradle 8.x, which will
+   `android-tv` folder using any system-installed Gradle 8.x, which will
    create the missing `gradlew` files for you.
 4. **Run it**: pick a target device (see below) from the device dropdown
    and hit the green Run button, or `Build > Build Bundle(s)/APK(s) >
    Build APK(s)` if you just want an installable `.apk` file.
+
+This gives you a **debug** build — fine for side-loading onto your own TV
+over adb (see below), but Google Play won't accept it. For that, see
+"Signing a release build" next.
+
+## Signing a release build (for Google Play / Internal Testing)
+
+Play Console requires every release to be signed with a real key, and
+once you've published a first version under that key, every future
+update must be signed with the *same* key forever — Google can't swap it
+for you later. So the one thing to actually be careful with here: **back
+up the keystore file and its passwords somewhere durable** (a password
+manager, not just this disk) the moment you create it. If it's lost,
+there's no "update" path for that app listing ever again — only a brand
+new one.
+
+1. **Generate the keystore once**, from a terminal with a JDK on your
+   `PATH` (Android Studio's own JDK works — on most installs that's
+   something like `~/Library/Java/JavaVirtualMachines/...` on macOS, or
+   bundled under Android Studio's install directory on Windows/Linux; any
+   JDK 17 works just as well):
+   ```
+   cd android-tv
+   keytool -genkeypair -v -keystore release-key.jks -alias vyzn-tv \
+     -keyalg RSA -keysize 2048 -validity 10000
+   ```
+   It'll prompt for a keystore password, a key password (can be the same
+   value), and some certificate info (name/org/etc. — none of it matters
+   much for an app that's never going to Production/public listing, just
+   fill in something sensible).
+2. **Create `android-tv/keystore.properties`** (already gitignored — this
+   file and the `.jks` it points at must never be committed):
+   ```
+   storeFile=release-key.jks
+   storePassword=<the keystore password you set>
+   keyAlias=vyzn-tv
+   keyPassword=<the key password you set>
+   ```
+3. That's it — `app/build.gradle.kts` picks this up automatically. From
+   here, `Build > Generate Signed Bundle / APK > Android App Bundle`
+   produces a signed `.aab` (Play Console wants an **App Bundle**, not a
+   plain `.apk`, for a new app) at
+   `app/build/outputs/bundle/release/app-release.aab` — that's the file
+   you upload to the Internal Testing track in Play Console. Running
+   `Build > Build Bundle(s)/APK(s) > Build APK(s)` with the release
+   variant selected also produces a signed `app-release.apk`, if you want
+   one to side-load directly instead of going through Play Console.
 
 ## Installing on a real Google TV / Android TV device
 
