@@ -83,15 +83,25 @@ function getBool(key, defaultValue = false) {
 /**
  * Sets (or clears, with null/undefined/'') a config override. Clearing
  * deletes the row so the env var takes over again on the next get().
+ *
+ * Trims string values defensively: a value with stray leading/trailing
+ * whitespace (easy to pick up pasting an API key from a browser) would
+ * otherwise be stored and sent to providers like TMDB byte-for-byte,
+ * which reject it as an invalid key — surfacing as a confusing 401 that
+ * looks like "the key doesn't work" when the key itself is actually
+ * fine. The Settings form's own submit handler also trims before
+ * sending, but this is kept here too as a second line of defense for
+ * any other caller of set().
  */
 function set(key, value) {
   if (!(key in SCHEMA)) {
     throw new Error(`Unknown setting: ${key}`);
   }
-  if (value === null || value === undefined || value === '') {
+  const trimmed = typeof value === 'string' ? value.trim() : value;
+  if (trimmed === null || trimmed === undefined || trimmed === '') {
     deleteStmt.run(key);
   } else {
-    upsertStmt.run(key, String(value));
+    upsertStmt.run(key, String(trimmed));
   }
 }
 

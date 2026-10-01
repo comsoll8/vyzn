@@ -3226,7 +3226,7 @@ configFormEl.addEventListener('submit', async (e) => {
   const body = {};
   configFormEl.querySelectorAll('[data-config-key]').forEach((input) => {
     const key = input.dataset.configKey;
-    body[key] = input.type === 'checkbox' ? String(input.checked) : input.value;
+    body[key] = input.type === 'checkbox' ? String(input.checked) : input.value.trim();
   });
   configSaveStatusEl.textContent = 'Saving…';
   try {
