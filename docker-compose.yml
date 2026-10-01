@@ -3,6 +3,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Build-time npm installs were timing out reaching registry.npmjs.org
+      # on this host even with the Dockerfile's --dns-result-order=
+      # ipv4first fix. Docker's default build network uses its own
+      # internal DNS resolver (127.0.0.11) rather than the host's — on
+      # some Unraid setups that resolver itself is unreliable, independent
+      # of IPv4/IPv6. network: host makes the build use the host's own
+      # working network/DNS directly instead, sidestepping that resolver
+      # entirely. This only affects the build step — the running
+      # container's own network (ports, etc.) is unchanged below.
+      network: host
     container_name: media-server
     restart: unless-stopped
     ports:
