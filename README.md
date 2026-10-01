@@ -1065,18 +1065,40 @@ playback works before wiring up Docker or the TV app.
 
 ## Running on Unraid
 
-1. Copy this whole folder to your Unraid box (e.g. via SMB into
-   `/mnt/user/appdata/media-server-src`, or clone a git repo there).
+1. Clone this repo onto your Unraid box, e.g. into
+   `/mnt/user/appdata/vyzn-src` (keep this separate from the
+   `/config`/`/transcode` data folder referenced in `docker-compose.yml`'s
+   volumes).
 2. Edit `docker-compose.yml`:
-   - Point `/mnt/user/media` at your actual media share if it's named
+   - Point `/mnt/user/Media` at your actual media share if it's named
      differently.
    - Adjust `TZ` if needed.
 3. From that directory on Unraid:
    ```bash
-   docker compose up -d --build
+   DOCKER_BUILDKIT=0 docker compose up -d --build
    ```
-4. Check it's alive: `curl http://<unraid-ip>:8080/health`
-5. Trigger a scan: `curl -X POST http://<unraid-ip>:8080/api/scan`
+   (see "Updating" below for why `DOCKER_BUILDKIT=0` is required on this
+   host, and `./update.sh` as a shortcut that bakes it in.)
+4. Check it's alive: `curl http://<unraid-ip>:18080/health`
+5. Trigger a scan: `curl -X POST http://<unraid-ip>:18080/api/scan`
+
+### Updating
+
+```bash
+cd /mnt/user/appdata/vyzn-src
+./update.sh
+```
+
+This runs `git pull` followed by `DOCKER_BUILDKIT=0 docker compose up -d
+--build`. The `DOCKER_BUILDKIT=0` part matters: Docker's default builder
+(BuildKit) silently ignores `docker-compose.yml`'s `build: network: host`
+setting and falls back to its own internal build network, whose DNS/IPv6
+handling can be unreliable on some Unraid hosts — in testing this caused
+`npm install` to hang for 30+ minutes during the build. The older "classic"
+builder, selected by setting `DOCKER_BUILDKIT=0`, honors `network: host`
+properly and finishes the same install in under a minute. `update.sh` sets
+this for you so it's never something you need to remember by hand; running
+`docker compose up -d --build` directly without it may hang on this host.
 
 ### Hardware transcoding (optional, recommended)
 
