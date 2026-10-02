@@ -1022,6 +1022,21 @@ outright, regardless of what's inside it.
   (`.Trash-99` and similar) and a few known junk folder names are always
   skipped at any depth. Add more with `SCAN_SKIP_DIRS=foo,bar`.
 
+Separately, `SCAN_TV_DIRS=TvShows` (default) decides which of the folders
+you allowed above count as **TV** rather than **movie** — this is what
+decides whether a file gets searched against TMDB's TV catalog or its
+movie catalog. If your TV folder isn't named `TvShows` (e.g. it's a plain
+`tv`), update this too — matching the folder name you used in
+`SCAN_ONLY_DIRS`, case-insensitive. If you skip this, every file under
+your TV folder still gets scanned and added to the library (since
+`SCAN_ONLY_DIRS` let it through), but silently misclassified as a movie
+and searched against the wrong TMDB endpoint — showing up as a large pile
+of permanently "unmatched" TV episodes with no obvious error anywhere.
+After changing `SCAN_TV_DIRS` on a library that was already scanned
+wrong, re-run a scan — or wipe the library first (Settings > Danger Zone)
+for a clean rebuild — to reclassify those files; just updating the
+setting doesn't retroactively fix rows already in the database.
+
 If you already ran a scan before this existed and your library has junk
 in it, clean it up without re-scanning from scratch:
 
