@@ -1021,6 +1021,44 @@ body.detail-open { overflow: hidden; }
   padding: 60px 0;
 }
 
+/* --- Generic pulsing-logo loading indicator -----------------------------
+   The one loading affordance used everywhere something is loading — the
+   library grid/rows on first load, the video player's buffering overlay,
+   the Unmatched/App Switcher lists, etc. — instead of a plain spinner
+   ring or bare "Loading..." text. Built in app.js by loadingMarkup();
+   grid-column: 1/-1 mirrors .empty-state so it also behaves inside a
+   CSS grid container like #grid. Always points at
+   vyzn-mark-scanning.svg — the same pulsing variant swapped into the
+   topbar logo during a scan (see showScanProgress in app.js), since its
+   animation is self-contained in the SVG file itself. */
+.loading-state {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: 60px 0;
+  color: var(--text-dim);
+}
+
+.loading-state-compact { padding: 20px 0; }
+
+.loading-mark {
+  width: 56px;
+  height: 56px;
+  display: block;
+}
+
+.loading-mark-sm { width: 32px; height: 32px; }
+.loading-mark-lg { width: 72px; height: 72px; }
+
+.loading-state-text {
+  margin: 0;
+  font-size: 14px;
+}
+
 .card {
   position: relative;
   cursor: pointer;
@@ -1935,18 +1973,6 @@ select:focus-visible,
 }
 .player-loading.hidden { display: none; }
 
-.player-loading-spinner {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  border: 3px solid rgba(var(--accent-rgb), 0.25);
-  border-top-color: var(--accent);
-  animation: player-spin 0.8s linear infinite;
-}
-@keyframes player-spin {
-  to { transform: rotate(360deg); }
-}
-
 .player-loading-text {
   margin: 0;
   color: var(--text);
@@ -1961,11 +1987,11 @@ select:focus-visible,
 }
 .player-loading-actions.hidden { display: none; }
 
-/* Error state: no spinner, just the message + actions — set on
+/* Error state: no pulsing logo, just the message + actions — set on
    #playerLoading via classList.toggle('player-loading--error', ...) in
    app.js rather than a second markup block, so it shares the same
    glass/position/sizing as the loading state. */
-.player-loading--error .player-loading-spinner { display: none; }
+.player-loading--error .loading-mark { display: none; }
 .player-loading--error .player-loading-text { color: var(--text); font-size: 15px; font-weight: 600; }
 
 /* Playback now requests real (OS/browser-level) fullscreen automatically

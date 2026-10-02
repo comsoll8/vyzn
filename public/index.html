@@ -110,7 +110,10 @@
     </section>
 
     <main id="rows" class="rows">
-      <p class="empty-state">Loading library...</p>
+      <div class="loading-state">
+        <img src="/assets/vyzn-mark-scanning.svg" alt="" class="loading-mark" />
+        <p class="loading-state-text">Loading library...</p>
+      </div>
     </main>
 
     <main id="grid" class="grid hidden"></main>
@@ -451,7 +454,7 @@
              and Retry/Close so a failed start doesn't fall back to a
              native alert() dialog. -->
         <div id="playerLoading" class="player-loading hidden">
-          <div class="player-loading-spinner"></div>
+          <img src="/assets/vyzn-mark-scanning.svg" alt="" class="loading-mark" />
           <p id="playerLoadingText" class="player-loading-text">Starting stream…</p>
           <div id="playerLoadingActions" class="player-loading-actions hidden">
             <button id="playerLoadingRetryBtn" class="btn-primary">Try Again</button>

@@ -73,6 +73,22 @@ const settingsScanProgressFillEl = document.getElementById('settingsScanProgress
 const settingsScanProgressTextEl = document.getElementById('settingsScanProgressText');
 const TOPBAR_LOGO_IDLE_SRC = '/assets/vyzn-mark.svg';
 const TOPBAR_LOGO_SCANNING_SRC = '/assets/vyzn-mark-scanning.svg';
+
+// Markup for the pulsing-logo loading indicator used everywhere something
+// is loading — the library grid on first load, the video player's
+// buffering overlay, the Unmatched/App Switcher lists, etc. — in place of
+// a plain spinner ring or bare "Loading..." text, so the one animated mark
+// doubles as the app's loading affordance everywhere it appears.
+// opts: { size: 'sm' | '' | 'lg', compact: boolean (tighter padding, for
+// use inside an already-small panel like the Unmatched list) }.
+function loadingMarkup(text, opts = {}) {
+  const sizeClass = opts.size ? ` loading-mark-${opts.size}` : '';
+  const compactClass = opts.compact ? ' loading-state-compact' : '';
+  return `<div class="loading-state${compactClass}">
+    <img src="${TOPBAR_LOGO_SCANNING_SRC}" alt="" class="loading-mark${sizeClass}" />
+    ${text ? `<p class="loading-state-text">${text}</p>` : ''}
+  </div>`;
+}
 const controlCenterBtn = document.getElementById('controlCenterBtn');
 const activeProfileNameEl = document.getElementById('activeProfileName');
 const appSwitcherBtn = document.getElementById('appSwitcherBtn');
@@ -1222,7 +1238,7 @@ async function renderTvGrid() {
   heroEl.classList.add('hidden');
   rowsEl.classList.add('hidden');
   gridEl.classList.remove('hidden');
-  gridEl.innerHTML = '<p class="empty-state">Loading shows...</p>';
+  gridEl.innerHTML = loadingMarkup('Loading shows...');
 
   const profileId = state.profile ? state.profile.id : '';
   const url = profileId ? `/api/shows?profile_id=${profileId}` : '/api/shows';
@@ -2931,7 +2947,7 @@ function renderAppSwitcherEmpty() {
 async function openAppSwitcher() {
   appSwitcherOverlayEl.classList.remove('hidden');
   enterOverlay();
-  appSwitcherTrackEl.innerHTML = '<p class="app-switcher-empty">Loading...</p>';
+  appSwitcherTrackEl.innerHTML = loadingMarkup('', { size: 'sm', compact: true });
   const jobs = await fetchJson('/api/streams/active');
   if (!jobs || jobs.length === 0) {
     renderAppSwitcherEmpty();
@@ -3541,7 +3557,7 @@ function updateUnmatchedCount(delta) {
 }
 
 async function loadUnmatchedList() {
-  unmatchedListEl.innerHTML = '<p class="empty-state" style="padding:20px 0;">Loading...</p>';
+  unmatchedListEl.innerHTML = loadingMarkup('', { size: 'sm', compact: true });
   const items = await fetchJson('/api/library/unmatched');
   setUnmatchedCount(items.length);
   if (items.length === 0) {
