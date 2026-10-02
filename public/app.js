@@ -474,14 +474,71 @@ function focusInDirection(direction) {
 
   if (best) {
     best.focus();
-    // 'auto' (instant), not 'smooth': a remote's D-pad auto-repeats while
-    // held, firing focusInDirection() every ~100ms or faster, and each
-    // call was queuing/interrupting the previous smooth-scroll animation
-    // — the visible result was scroll position visibly stuttering/
-    // fighting itself, part of what read as "clunky" navigation. An
-    // instant snap has no animation to interrupt, so rapid repeats just
-    // track the remote directly instead of lagging behind it.
-    if (best.scrollIntoView) best.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'auto' });
+    // Deliberately NOT best.scrollIntoView() — on at least one real
+    // Android TV box, calling scrollIntoView() on an element inside our
+    // own overflow:auto containers (.rows, .shelf-track) silently did
+    // nothing: focus moved but the container's scroll position never
+    // changed, leaving a row visibly stuck/cut off at the edge of the
+    // screen no matter how far "down" was pressed. scrollIntoView's
+    // target-ancestor-and-offset math is entirely internal to the
+    // browser engine, so there's nothing to fix about our CSS when it's
+    // simply not implemented correctly — safer to never depend on it for
+    // the TV remote's primary navigation path and compute the needed
+    // scroll ourselves instead. See bringIntoViewManually() below.
+    bringIntoViewManually(best);
+  }
+}
+
+// Manual replacement for Element.scrollIntoView({block:'nearest',
+// inline:'nearest'}) — see the comment above focusInDirection()'s call
+// site for why. Walks every scrollable ancestor up to <body> (there are
+// exactly two in this app: the vertical .rows shelf list and, inside
+// each shelf, the horizontal .shelf-track), and for each one, nudges its
+// scrollTop/scrollLeft by exactly the amount needed to bring `el` fully
+// inside that ancestor's visible box — never more, so a card already
+// fully visible in a given ancestor leaves that ancestor untouched. Pure
+// arithmetic on getBoundingClientRect(), no engine-specific scrolling
+// API involved.
+function bringIntoViewManually(el) {
+  let node = el.parentElement;
+  while (node && node !== document.body && node !== document.documentElement) {
+    const cs = getComputedStyle(node);
+    const canScrollY = (cs.overflowY === 'auto' || cs.overflowY === 'scroll') && node.scrollHeight > node.clientHeight + 1;
+    const canScrollX = (cs.overflowX === 'auto' || cs.overflowX === 'scroll') && node.scrollWidth > node.clientWidth + 1;
+    if (canScrollY || canScrollX) {
+      const elRect = el.getBoundingClientRect();
+      const containerRect = node.getBoundingClientRect();
+      if (canScrollY) {
+        if (elRect.top < containerRect.top) node.scrollTop -= (containerRect.top - elRect.top);
+        else if (elRect.bottom > containerRect.bottom) node.scrollTop += (elRect.bottom - containerRect.bottom);
+      }
+      if (canScrollX) {
+        if (elRect.left < containerRect.left) node.scrollLeft -= (containerRect.left - elRect.left);
+        else if (elRect.right > containerRect.right) node.scrollLeft += (elRect.right - containerRect.right);
+      }
+    }
+    node = node.parentElement;
+  }
+}
+
+// Manual replacement for Element.scrollIntoView({block:'start'}) — same
+// reasoning as bringIntoViewManually() above (native scrollIntoView not
+// reliably moving our overflow:auto containers on at least one real
+// Android TV box). Used for the genre-pill "jump to this shelf" action,
+// which needs the shelf's top aligned with its scroll container's top
+// rather than just nudged minimally into view.
+function scrollShelfToTop(el) {
+  if (!el) return;
+  let node = el.parentElement;
+  while (node && node !== document.body && node !== document.documentElement) {
+    const cs = getComputedStyle(node);
+    if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && node.scrollHeight > node.clientHeight + 1) {
+      const elRect = el.getBoundingClientRect();
+      const containerRect = node.getBoundingClientRect();
+      node.scrollTop += (elRect.top - containerRect.top);
+      return;
+    }
+    node = node.parentElement;
   }
 }
 
@@ -962,8 +1019,7 @@ function renderGenrePills(genres) {
     btn.addEventListener('click', () => {
       setActiveGenrePill(btn);
       closeGenreFilter();
-      const target = document.getElementById(`genre-shelf-${genre.id}`);
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollShelfToTop(document.getElementById(`genre-shelf-${genre.id}`));
     });
     genrePillsEl.appendChild(btn);
   }
@@ -1740,8 +1796,7 @@ function goToGenre(genreId) {
   searchEl.value = '';
   genreFilterBtn.classList.remove('hidden');
   renderHome().then(() => {
-    const target = document.getElementById(`genre-shelf-${genreId}`);
-    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    scrollShelfToTop(document.getElementById(`genre-shelf-${genreId}`));
   });
 }
 
