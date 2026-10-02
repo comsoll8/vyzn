@@ -78,6 +78,29 @@
   --glass-blur-scale: 0;
 }
 
+/* --- TV overscan safe area ----------------------------------------------
+   Some TVs/boxes (older sets, projectors, some HDMI scalers) crop a thin
+   margin around the physical screen edges rather than showing the true
+   1:1 pixel image — "overscan". It's a display-level crop, not a page
+   layout bug, so scrolling doesn't help: whatever happens to be sitting
+   at the true edge of the viewport gets clipped no matter what. Most of
+   this app already has generous internal margins and is fine, but a few
+   places are deliberately designed to run flush to the edge (the last
+   shelf row at the bottom of .rows' own scroll box, the last poster at
+   the end of a horizontally-scrolled .shelf-track, the grid's own edges)
+   — those need somewhere inside the true edge to land. Scoped to .tv-app
+   only; desktop/mobile browsers are untouched. */
+.tv-app .rows {
+  padding-bottom: max(40px, 6vh);
+}
+.tv-app .shelf-track {
+  padding-right: max(40px, 6vw);
+}
+.tv-app .grid {
+  padding-right: max(20px, 6vw);
+  padding-bottom: max(20px, 6vh);
+}
+
 * { box-sizing: border-box; }
 
 body {
