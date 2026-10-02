@@ -116,25 +116,30 @@
    down into both .hero and .rows, which both read it) gives the first
    shelf real room on-screen without relying on scrolling to reach it. */
 .tv-app {
-  --hero-height: clamp(200px, 28vh, 320px);
+  /* Sized bigger again now that the layout below is "one shelf fills the
+     screen at a time" (see .tv-app .shelf further down) rather than
+     trying to fit several rows' worth — with only one shelf needing to
+     share the screen with the hero, the hero can afford more room than
+     it could when it was competing with multiple visible rows. */
+  --hero-height: clamp(320px, 42vh, 520px);
 }
 .tv-app .hero-content {
-  padding: 0 40px 12px;
-  max-width: 640px;
+  padding: 0 40px 20px;
+  max-width: 680px;
 }
 .tv-app .hero-content h2 {
-  font-size: 24px;
-  margin: 0 0 6px;
+  font-size: 34px;
+  margin: 0 0 10px;
 }
 .tv-app .hero-meta {
-  margin-bottom: 6px;
-  font-size: 11px;
+  margin-bottom: 10px;
+  font-size: 13px;
 }
 .tv-app .hero-content p {
-  font-size: 12px;
-  line-height: 1.35;
-  margin: 0 0 6px;
-  -webkit-line-clamp: 1;
+  font-size: 14px;
+  line-height: 1.4;
+  margin: 0 0 10px;
+  -webkit-line-clamp: 2;
 }
 
 /* Also shrink the shelf cards themselves on TV — the >=1600px "large
@@ -143,13 +148,28 @@
    that ends up oversized and limits how much of each row/how many rows
    fit on screen at once. */
 .tv-app .shelf-track .card {
-  flex-basis: 110px;
-  width: 110px;
+  flex-basis: 105px;
+  width: 105px;
 }
 /* Same reasoning for the Movies/TV flat-grid tab's cards — the >=1600px
    "large screens" rule also bumps .grid up to 200px columns. */
 .tv-app .grid {
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
+}
+
+/* --- One shelf fills the screen at a time ---------------------------------
+   Instead of .rows showing however many shelves happen to fit (plus
+   whatever partial sliver of the next one didn't), each shelf is forced
+   to take up the container's full available height, so exactly one is
+   ever on screen below the hero. Navigating down brings the next shelf's
+   cards into view via bringIntoViewManually() (see app.js), which — since
+   the shelf the focused card lives in now fills the whole container —
+   scrolls straight to that shelf's top rather than landing mid-shelf. */
+.tv-app .shelf {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 * { box-sizing: border-box; }
