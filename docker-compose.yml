@@ -22,6 +22,17 @@ services:
     restart: unless-stopped
     ports:
       - "18080:8080"
+    # Containers started via `docker compose` (rather than Unraid's own
+    # "Add Container" template form) show up in the Docker tab with no
+    # icon/WebUI button and no way to set them from the UI — clicking the
+    # icon does nothing, since there's no backing XML template to edit.
+    # Unraid's Docker page reads these two labels directly for exactly
+    # that case: icon is the app's own favicon served over the mapped
+    # port, webui uses Unraid's [IP]/[PORT:x] placeholders so the link
+    # works regardless of which host IP/port this ends up bound to.
+    labels:
+      net.unraid.docker.icon: "http://[IP]:[PORT:8080]/assets/favicon-256.png"
+      net.unraid.docker.webui: "http://[IP]:[PORT:8080]/"
     environment:
       - PUID=99
       - PGID=100

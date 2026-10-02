@@ -32,6 +32,12 @@ services:
     restart: unless-stopped
     ports:
       - "18080:8080"
+    # See docker-compose.yml for why these are here: Unraid's Docker tab
+    # has no icon/WebUI for a docker-compose-started container (no XML
+    # template to edit from the UI), but reads these two labels directly.
+    labels:
+      net.unraid.docker.icon: "http://[IP]:[PORT:8080]/assets/favicon-256.png"
+      net.unraid.docker.webui: "http://[IP]:[PORT:8080]/"
     environment:
       - PUID=99
       - PGID=100
