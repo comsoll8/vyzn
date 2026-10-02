@@ -32,6 +32,7 @@ services:
       - HW_TRANSCODE=true          # set false to fall back to CPU (libx264)
       - LIBVA_DRIVER_NAME=iHD      # use "i965" instead on pre-Broadwell Intel CPUs
       - SCAN_ONLY_DIRS=Movies,TvShows   # only these top-level folders under MEDIA_DIR are scanned
+      - SCAN_TV_DIRS=TvShows            # which of the folders above are TV (not movies) — e.g. set to "tv" if your share uses a plain lowercase "tv" folder. Must list the SAME folder name(s) you used in SCAN_ONLY_DIRS, or everything in them gets misclassified as movies.
       - SCAN_PROBE_CONCURRENCY=4        # parallel ffprobe processes (CPU-bound; ~core count)
       - SCAN_TMDB_CONCURRENCY=15        # parallel TMDB lookups (network-bound; safe to raise for big libraries)
       # TMDB_API_KEY, TMDB_AUTH_TOKEN, SEERR_URL, SEERR_API_KEY, and

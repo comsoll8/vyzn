@@ -67,6 +67,20 @@ const ONLY_TOP_LEVEL_DIRS = (
   .map((s) => s.trim())
   .filter(Boolean);
 
+// Which of the top-level folders above (if any match SCAN_ONLY_DIRS) hold TV
+// content rather than movies — used by mediaTypeFromPath() below. This used
+// to be a single hardcoded check for a folder literally named "TvShows",
+// completely independent of SCAN_ONLY_DIRS: a library whose TV folder was
+// scanned under a different name (e.g. a plain "tv" folder, allowed in via
+// SCAN_ONLY_DIRS=Movies,tv) would have every one of its files silently
+// classified as a movie and searched against the wrong TMDB endpoint,
+// guaranteeing a "no match" for all of them. Comma-separated,
+// case-insensitive, defaults to "TvShows" for backwards compatibility.
+const TV_TOP_LEVEL_DIRS = (process.env.SCAN_TV_DIRS || 'TvShows')
+  .split(',')
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+
 function shouldSkipDir(name) {
   if (name.startsWith('.') && name !== '.' && name !== '..') return true; // hidden dirs generally
   const lower = name.toLowerCase();
@@ -387,14 +401,15 @@ async function enrichTvEpisode(row) {
 }
 
 // Which top-level folder a file lives under decides whether we search TMDB's
-// movie or TV catalog for it. Matches the same /Movies//TvShows/ convention
-// the frontend used to infer this from file_path directly.
+// movie or TV catalog for it. TV_TOP_LEVEL_DIRS (SCAN_TV_DIRS) is the
+// configurable list of folder names that count as TV — anything else
+// defaults to movie, same as before, but the TV folder name itself is no
+// longer hardcoded to "TvShows".
 function mediaTypeFromPath(filePath) {
   const rel = path.relative(MEDIA_DIR, filePath).split(path.sep);
   const top = (rel[0] || '').toLowerCase();
-  if (top === 'tvshows') return 'tv';
-  if (top === 'movies') return 'movie';
-  return 'movie'; // default guess for anything scanned outside the usual two folders
+  if (TV_TOP_LEVEL_DIRS.includes(top)) return 'tv';
+  return 'movie'; // default guess for anything not under a configured TV folder
 }
 
 const upsertStmt = db.prepare(`
