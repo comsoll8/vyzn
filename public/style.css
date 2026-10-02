@@ -116,25 +116,35 @@
    down into both .hero and .rows, which both read it) gives the first
    shelf real room on-screen without relying on scrolling to reach it. */
 .tv-app {
-  --hero-height: clamp(280px, 38vh, 460px);
+  --hero-height: clamp(200px, 28vh, 320px);
 }
 .tv-app .hero-content {
-  padding: 0 40px 16px;
-  max-width: 720px;
+  padding: 0 40px 12px;
+  max-width: 640px;
 }
 .tv-app .hero-content h2 {
-  font-size: 32px;
-  margin: 0 0 8px;
+  font-size: 24px;
+  margin: 0 0 6px;
 }
 .tv-app .hero-meta {
-  margin-bottom: 8px;
-  font-size: 12px;
+  margin-bottom: 6px;
+  font-size: 11px;
 }
 .tv-app .hero-content p {
-  font-size: 13px;
-  line-height: 1.4;
-  margin: 0 0 10px;
-  -webkit-line-clamp: 2;
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 0 0 6px;
+  -webkit-line-clamp: 1;
+}
+
+/* Also shrink the shelf cards themselves on TV — the >=1600px "large
+   screens" rule (further down) bumps cards to 200px wide, tuned for a
+   desktop monitor at arm's length, not a TV viewed from a couch where
+   that ends up oversized and limits how much of each row/how many rows
+   fit on screen at once. */
+.tv-app .shelf-track .card {
+  flex-basis: 150px;
+  width: 150px;
 }
 
 * { box-sizing: border-box; }
