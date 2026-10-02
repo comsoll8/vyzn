@@ -1,7 +1,9 @@
 package com.vyzn.tv
 
 import android.annotation.SuppressLint
+import android.app.UiModeManager
 import android.content.Context
+import android.content.res.Configuration
 import android.net.http.SslError
 import android.os.Bundle
 import android.text.InputType
@@ -108,6 +110,16 @@ class MainActivity : AppCompatActivity() {
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
     }
 
+    // True on a real Android TV / Google TV device (or an emulator image
+    // configured as one); false on a phone, tablet, or any device without
+    // the "television" UI mode. Used to decide whether this install gets
+    // the TV web layout (D-pad shelf nav, landscape-only hero/cards) or the
+    // site's normal mobile-responsive one.
+    private fun isTelevision(): Boolean {
+        val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
+        return uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
+    }
+
     // --- WebView setup -----------------------------------------------------
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -131,11 +143,19 @@ class MainActivity : AppCompatActivity() {
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         // Lets the web app (index.html's inline UA-sniff script) tell this
         // wrapper apart from a desktop/mobile browser hitting the same
-        // server, so it can turn off backdrop-filter blur — see style.css's
-        // .tv-app rule. That blur is expensive to composite and is very
-        // likely the main cause of sluggishness on real TV-box hardware;
-        // nothing else about the page changes for this app.
-        settings.userAgentString = settings.userAgentString + " VyznTV"
+        // server, so it can turn off backdrop-filter blur and switch to the
+        // D-pad-friendly shelf layout — see style.css's .tv-app rule. That
+        // blur is expensive to composite and is very likely the main cause
+        // of sluggishness on real TV-box hardware.
+        //
+        // Only added on an actual television (isTelevision() below) — this
+        // same APK also installs on phones/tablets (see the manifest's
+        // launcher intent-filter), and there the page should render its
+        // own existing mobile-responsive layout instead of the TV one, now
+        // that MainActivity is no longer landscape-locked.
+        if (isTelevision()) {
+            settings.userAgentString = settings.userAgentString + " VyznTV"
+        }
 
         webView.isFocusable = true
         webView.isFocusableInTouchMode = true

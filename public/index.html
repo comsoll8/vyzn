@@ -9,9 +9,12 @@
        in style.css for why) is already present for first paint, not added
        a moment late and causing a flash of the slow blurred version. The
        "VyznTV" marker is appended to the WebView's own user agent string
-       in vyzn-tv's MainActivity.kt (configureWebView()) — nothing else
-       sends a user agent containing that string, so this only ever
-       matches the Android TV wrapper app, never a desktop/mobile browser. -->
+       in vyzn-tv's MainActivity.kt (configureWebView(), gated on
+       isTelevision()) — nothing else sends a user agent containing that
+       string, so this only ever matches the Android app running on an
+       actual TV device, never a desktop/mobile browser, and never the
+       same app installed on a phone or tablet (which gets this site's
+       normal mobile-responsive layout instead). -->
   <script>
     if (navigator.userAgent.indexOf('VyznTV') !== -1) {
       document.documentElement.classList.add('tv-app');

@@ -25,10 +25,19 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@style/Theme.Vyzn">
 
+        <!-- screenOrientation is "unspecified" (follows the device/sensor)
+             rather than a hard "landscape" lock: a real TV box has no
+             rotation sensor and its launcher only ever runs apps in
+             landscape anyway, so this activity still only ever renders
+             landscape there — but on a phone/tablet it now lets the
+             person rotate to portrait, which is what MainActivity.kt's
+             isTelevision() check (configureWebView()) uses to decide
+             whether to apply the TV web layout or the site's existing
+             mobile-responsive one. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:screenOrientation="landscape"
+            android:screenOrientation="unspecified"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|uiMode"
             android:launchMode="singleTop"
             android:theme="@style/Theme.Vyzn">
