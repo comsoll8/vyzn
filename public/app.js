@@ -485,7 +485,23 @@ function focusInDirection(direction) {
     // simply not implemented correctly — safer to never depend on it for
     // the TV remote's primary navigation path and compute the needed
     // scroll ourselves instead. See bringIntoViewManually() below.
-    bringIntoViewManually(best);
+    if (direction === 'up' || direction === 'down') {
+      // A plain "nudge the focused CARD into view" (bringIntoViewManually,
+      // used below for left/right) was still clipping shelf titles here:
+      // on a .rows container shorter than one full shelf's content
+      // (title + track), bringing just the card's bottom into view can
+      // require scrolling past the title entirely, pushing it above the
+      // visible top. Aligning the whole shelf's top to .rows' top instead
+      // guarantees the title is always fully visible — the trade-off is
+      // that a shelf taller than one screen has its BOTTOM trimmed
+      // instead, which reads as "scroll for more", not a clipped label.
+      scrollShelfToTop(best.closest('.shelf'));
+      // Still need horizontal (shelf-track) positioning for whichever
+      // card ended up focused — scrollShelfToTop only handles .rows.
+      bringIntoViewManually(best, { vertical: false });
+    } else {
+      bringIntoViewManually(best);
+    }
   }
 }
 
@@ -499,11 +515,11 @@ function focusInDirection(direction) {
 // fully visible in a given ancestor leaves that ancestor untouched. Pure
 // arithmetic on getBoundingClientRect(), no engine-specific scrolling
 // API involved.
-function bringIntoViewManually(el) {
+function bringIntoViewManually(el, { vertical = true } = {}) {
   let node = el.parentElement;
   while (node && node !== document.body && node !== document.documentElement) {
     const cs = getComputedStyle(node);
-    const canScrollY = (cs.overflowY === 'auto' || cs.overflowY === 'scroll') && node.scrollHeight > node.clientHeight + 1;
+    const canScrollY = vertical && (cs.overflowY === 'auto' || cs.overflowY === 'scroll') && node.scrollHeight > node.clientHeight + 1;
     const canScrollX = (cs.overflowX === 'auto' || cs.overflowX === 'scroll') && node.scrollWidth > node.clientWidth + 1;
     if (canScrollY || canScrollX) {
       const elRect = el.getBoundingClientRect();
