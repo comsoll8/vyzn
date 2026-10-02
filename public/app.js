@@ -551,7 +551,16 @@ function scrollShelfToTop(el) {
     if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && node.scrollHeight > node.clientHeight + 1) {
       const elRect = el.getBoundingClientRect();
       const containerRect = node.getBoundingClientRect();
-      node.scrollTop += (elRect.top - containerRect.top);
+      // containerRect.top is the container's OUTER (border) box edge —
+      // before its own top padding. .rows specifically has extra top
+      // padding reserved as blank space for the hero's fade to cross
+      // (see style.css, calc(24px + var(--hero-row-overlap))), so
+      // aligning straight to containerRect.top pulls real content back
+      // up into that reserved band — which is exactly the clipping bug
+      // this function was just introduced to fix. Aligning to the
+      // padding-adjusted CONTENT edge instead is what actually avoids it.
+      const paddingTop = parseFloat(cs.paddingTop) || 0;
+      node.scrollTop += (elRect.top - (containerRect.top + paddingTop));
       return;
     }
     node = node.parentElement;
