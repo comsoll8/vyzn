@@ -1007,7 +1007,22 @@ body.detail-open { overflow: hidden; }
   height: calc(100vh - var(--hero-height) + var(--hero-row-overlap));
   min-height: 200px;
   overflow-y: auto;
-  padding: 24px 0 40px;
+  /* Top padding increased by exactly --hero-row-overlap: the negative
+     margin above pulls this box's top edge *up* into the hero's fade
+     zone (so the hero's own gradient has somewhere to visually blend
+     into), but without this, that same amount of REAL CONTENT — the
+     first shelf's own h3 title, not its poster art — got pulled up
+     under the hero too and visibly sliced off. (This was the actual bug
+     behind two different-looking reports: with the old 64px overlap it
+     was large enough to clip through the title AND into the poster top;
+     after shrinking the overlap to stop clipping posters, it became
+     roughly the title's own text height, so it clipped the title
+     instead — same root cause, different victim.) Adding the overlap
+     back as padding-top cancels the shift for actual content — the
+     title now lands exactly where it would with zero overlap — while
+     leaving the overlap band itself as blank space for the fade to
+     cross, which was the whole point in the first place. */
+  padding: calc(24px + var(--hero-row-overlap)) 0 40px;
   /* NOTE: do NOT put transform/translateZ on this element (the scroll
      container itself). We tried that as a fix for Android WebView
      repainting stale/clipped card content — see .card below, where the
