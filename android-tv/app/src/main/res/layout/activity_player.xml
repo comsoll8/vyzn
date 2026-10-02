@@ -7,4 +7,5 @@
     android:background="#000000"
     app:show_buffering="when_playing"
     app:resize_mode="fit"
-    app:use_controller="true" />
+    app:use_controller="true"
+    app:show_subtitle_button="true" />

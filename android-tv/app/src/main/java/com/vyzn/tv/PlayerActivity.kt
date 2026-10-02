@@ -11,12 +11,16 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import org.json.JSONObject
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
@@ -33,10 +37,12 @@ import java.util.concurrent.Executors
  * Activity sits on top of; closing this (Back) returns to it exactly where
  * it was.
  *
- * v1 scope, deliberately: play/pause/seek, resume position, and progress
- * reporting. Deferred (still going through the browser player today, which
- * is unaffected by any of this): subtitles, in-player audio track
- * switching, and Up Next/recommendations chaining. See vyzn-tv/README.md.
+ * v1 scope, deliberately: play/pause/seek, resume position, progress
+ * reporting, and subtitles (on/off via PlayerView's built-in CC button —
+ * see fetchSubtitleInfo()/setUpPlayer()). Still deferred (going through the
+ * browser player today, which is unaffected by any of this): in-player
+ * audio track switching, and Up Next/recommendations chaining. See
+ * vyzn-tv/README.md.
  */
 class PlayerActivity : AppCompatActivity() {
 
@@ -78,7 +84,16 @@ class PlayerActivity : AppCompatActivity() {
             Toast.makeText(this, it, Toast.LENGTH_SHORT).show()
         }
 
-        setUpPlayer()
+        // Same couple-seconds-of-grace trade-off the browser player already
+        // makes on every /api/stream call (see that route's comment in
+        // server.js): worth a short wait so subtitles are there from the
+        // first frame, rather than plumbing a mid-playback MediaItem swap
+        // for what's usually a sub-second lookup anyway (the .vtt is
+        // normally already cached from a previous play of this item).
+        progressExecutor.execute {
+            val subtitle = fetchSubtitleInfo(serverBaseUrl, itemId)
+            mainHandler.post { setUpPlayer(subtitle) }
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -93,17 +108,37 @@ class PlayerActivity : AppCompatActivity() {
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
     }
 
-    private fun setUpPlayer() {
+    private fun setUpPlayer(subtitle: SubtitleInfo?) {
         val exoPlayer = ExoPlayer.Builder(this).build()
         player = exoPlayer
         playerView.player = exoPlayer
         // ExoPlayer/PlayerView's built-in controller is already D-pad
         // navigable out of the box (real Android focus, not the web app's
-        // hand-rolled spatial-nav) — no custom controls needed here.
+        // hand-rolled spatial-nav) — no custom controls needed here, same
+        // as the CC button (show_subtitle_button in activity_player.xml)
+        // that toggles the subtitle track below.
         playerView.controllerShowTimeoutMs = 4000
 
         val rawUrl = "$serverBaseUrl/api/raw/$itemId"
-        val mediaItem = MediaItem.Builder().setUri(Uri.parse(rawUrl)).build()
+        val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(rawUrl))
+        if (subtitle != null) {
+            val subtitleConfig = MediaItem.SubtitleConfiguration.Builder(Uri.parse(subtitle.url))
+                .setMimeType(MimeTypes.TEXT_VTT)
+                .apply { subtitle.language?.let { setLanguage(it) } }
+                .build()
+            mediaItemBuilder.setSubtitleConfigurations(listOf(subtitleConfig))
+        }
+        val mediaItem = mediaItemBuilder.build()
+
+        // Off by default, same as the browser player (subtitleUserEnabled
+        // starts false there too) — the CC button is what turns it on.
+        // Without this, DefaultTrackSelector can auto-select a text track
+        // on its own (e.g. one flagged "forced" in the source) the moment
+        // it's available, before the person asked for it.
+        exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
+            .buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+            .build()
 
         exoPlayer.addListener(object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
@@ -198,6 +233,39 @@ class PlayerActivity : AppCompatActivity() {
             connection?.disconnect()
         }
     }
+
+    // See server.js's GET /api/raw/:id/subtitles — triggers the same ffmpeg
+    // text-subtitle extraction /api/stream uses for browser playback (and
+    // the same up-to-2s grace period: fast when the .vtt is already
+    // cached, otherwise returns null rather than holding up playback).
+    // Null language/url fields, a network failure, or non-200 response all
+    // just mean "play without subtitles" — never worth failing playback
+    // over, same as a dropped progress report elsewhere in this class.
+    private fun fetchSubtitleInfo(base: String, id: Long): SubtitleInfo? {
+        var connection: HttpURLConnection? = null
+        try {
+            val url = URL("$base/api/raw/$id/subtitles")
+            connection = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 5000
+                readTimeout = 5000
+            }
+            if (connection.responseCode != HttpURLConnection.HTTP_OK) return null
+            val body = BufferedReader(InputStreamReader(connection.inputStream)).use { it.readText() }
+            val json = JSONObject(body)
+            if (json.isNull("subtitleUrl")) return null
+            val subtitleUrl = json.getString("subtitleUrl")
+            val language = if (json.isNull("language")) null else json.getString("language")
+            return SubtitleInfo(url = "$base$subtitleUrl", language = language)
+        } catch (e: Exception) {
+            Log.w(TAG, "Subtitle lookup failed for item $id", e)
+            return null
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
+    private data class SubtitleInfo(val url: String, val language: String?)
 
     override fun onDestroy() {
         stopProgressReporting()

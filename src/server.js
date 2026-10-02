@@ -1562,6 +1562,33 @@ async function main() {
     }
   });
 
+  // Subtitle sidecar for /api/raw's native-player path. /api/stream triggers
+  // extraction itself (it already demuxes the file for the HLS job), but
+  // /api/raw just pipes the original bytes straight through and never
+  // touches ffmpeg — so the native (ExoPlayer) player calls this
+  // separately, before/while it starts playback, to get the same .vtt the
+  // browser player would have gotten. Same extraction + grace-period
+  // behavior as /api/stream, just without also starting an HLS job.
+  fastify.get('/api/raw/:id/subtitles', async (request, reply) => {
+    const item = db.prepare('SELECT * FROM media_items WHERE id = ?').get(request.params.id);
+    if (!item) {
+      reply.code(404);
+      return { error: 'Media item not found' };
+    }
+
+    const subtitleTracks = item.subtitle_tracks ? JSON.parse(item.subtitle_tracks) : [];
+    const subtitleGracePeriod = new Promise((resolve) => setTimeout(() => resolve(null), 2000));
+    const subtitlePath = await Promise.race([
+      extractSubtitlesIfNeeded(item.id, item.file_path, subtitleTracks),
+      subtitleGracePeriod,
+    ]);
+
+    return {
+      subtitleUrl: subtitlePath ? `/stream-files/${item.id}/subs.vtt` : null,
+      language: subtitleTracks[0] ? subtitleTracks[0].language : null,
+    };
+  });
+
   // Serves the ORIGINAL media file byte-for-byte, with HTTP Range support,
   // for a client that can decode the source container/codecs itself —
   // currently only the Android TV app's native (ExoPlayer) player, which
