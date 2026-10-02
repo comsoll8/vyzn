@@ -23,4 +23,4 @@ echo "==> Rebuilding and restarting (classic builder — see comment above)"
 DOCKER_BUILDKIT=0 docker compose up -d --build
 
 echo "==> Done. Container status:"
-docker ps --filter name=media-server
+docker ps --filter name=vyzn

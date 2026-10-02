@@ -8,7 +8,7 @@ playback in a browser or the future Google TV app.
 ## What's here
 
 ```
-media-server/
+vyzn/
 ├── src/
 │   ├── server.js       # Fastify HTTP API + serves the browser frontend
 │   ├── db.js           # SQLite schema + connection
@@ -998,7 +998,7 @@ the host automatically, so this should work out of the box on Unraid.
   concurrent streams anyway.
 - Sanity-check the GPU is visible inside the container:
   ```bash
-  docker exec -it media-server vainfo
+  docker exec -it vyzn vainfo
   ```
   You should see a list of supported profiles (H264, HEVC, etc.) rather
   than an error.
@@ -1062,7 +1062,7 @@ available outside the container unless your local machine also has Intel
 drivers set up, so test locally with `HW_TRANSCODE=false` (the default).
 
 ```bash
-cd media-server
+cd vyzn
 npm install
 MEDIA_DIR=/path/to/your/videos TMDB_API_KEY=your_key_here npm start
 ```
@@ -1126,12 +1126,12 @@ transcoding of 4K content will otherwise struggle.
 
 Settings' System Info section now has a "⬇ Download Server Log" link.
 Previously the only way to see what the server logged was `docker logs
-media-server` on the Unraid box itself — fine for me to ask for, but a
+vyzn` on the Unraid box itself — fine for me to ask for, but a
 dead end if you're troubleshooting from your phone/couch and not at a
 terminal. The server now writes its log to a file as well as stdout
 (`docker logs` still shows the exact same thing it always did — that's
 unchanged), at `DATA_DIR/logs/server.log` (`/config/logs/server.log` on
-Unraid, inside the same `/mnt/user/appdata/media-server` volume the
+Unraid, inside the same `/mnt/user/appdata/vyzn` volume the
 database already lives in, so it survives restarts/rebuilds). The button
 is a plain `<a href="/api/logs/download" download>`, not a JS-driven
 fetch — it works even if something in `app.js` itself is broken, which is

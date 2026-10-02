@@ -26,9 +26,9 @@
 # `build:`. Keep the two in sync if either one changes.
 
 services:
-  media-server:
+  vyzn:
     image: ghcr.io/comsoll8/vyzn:latest   # pin to a version (e.g. :0.3.0) instead of :latest if you'd rather update on your own schedule
-    container_name: media-server
+    container_name: vyzn
     restart: unless-stopped
     ports:
       - "18080:8080"
@@ -48,10 +48,10 @@ services:
       # and take effect immediately with no restart. See src/config.js
       # in the source repo if you want the details.
     volumes:
-      - /mnt/user/appdata/media-server:/config
+      - /mnt/user/appdata/vyzn:/config
       - /mnt/user/Media:/media:ro
-      - /mnt/user/appdata/media-server/transcode:/transcode
-      - /mnt/user/appdata/media-server/theme-music:/app/public/theme-music
+      - /mnt/user/appdata/vyzn/transcode:/transcode
+      - /mnt/user/appdata/vyzn/theme-music:/app/public/theme-music
     devices:
       - /dev/dri:/dev/dri          # Intel QuickSync passthrough — remove this line if your box has no Intel iGPU
       - /dev/net/tun:/dev/net/tun  # Tailscale — lets the container create its own VPN network interface

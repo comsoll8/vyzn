@@ -1,5 +1,5 @@
 services:
-  media-server:
+  vyzn:
     build:
       context: .
       dockerfile: Dockerfile
@@ -18,7 +18,7 @@ services:
       # ./update.sh, which sets this for you) for network: host to
       # actually take effect. See the README's "Updating" section.
       network: host
-    container_name: media-server
+    container_name: vyzn
     restart: unless-stopped
     ports:
       - "18080:8080"
@@ -45,16 +45,16 @@ services:
       - TMDB_API_KEY=              # <-- put your TMDB v3 API key here (short one, not the eyJ... token)
       # - TMDB_AUTH_TOKEN=         # <-- use this instead if you have the long eyJ... read access token
     volumes:
-      - /mnt/user/appdata/media-server:/config
+      - /mnt/user/appdata/vyzn:/config
       - /mnt/user/Media:/media:ro
-      - /mnt/user/appdata/media-server/transcode:/transcode
+      - /mnt/user/appdata/vyzn/transcode:/transcode
       # Optional: drop a show's theme song in here as {tmdb_id}.mp3 (e.g.
       # 1396.mp3 for Breaking Bad) and the Show Detail page plays it
       # automatically. Mounted as its own volume so files placed here
       # survive `docker compose up --build` — public/ itself is baked into
       # the image and would otherwise wipe out anything dropped straight
       # into the container.
-      - /mnt/user/appdata/media-server/theme-music:/app/public/theme-music
+      - /mnt/user/appdata/vyzn/theme-music:/app/public/theme-music
     devices:
       - /dev/dri:/dev/dri          # Intel QuickSync passthrough
       - /dev/net/tun:/dev/net/tun  # Tailscale — lets the container create its own VPN network interface

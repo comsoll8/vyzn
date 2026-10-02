@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Real Android TV launcher-row banner (required 320x180dp), redrawn from
-     media-server/public/assets/vyzn-logo.svg (the wordmark: chevron mark +
+     public/assets/vyzn-logo.svg (the wordmark: chevron mark +
      "VYZN") as nested VectorDrawable groups — same technique as
      ic_launcher.xml, and for the same reason (crisp at any density, no PNG
      export step). The source SVG's "v0.2" accent subtext is dropped: it's

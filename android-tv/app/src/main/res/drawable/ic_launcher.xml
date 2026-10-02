@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Real launcher icon — the same chevron mark used everywhere else in the
-     app now (media-server/public/assets/vyzn-mark.svg), redrawn as a
+     app now (public/assets/vyzn-mark.svg), redrawn as a
      VectorDrawable so it stays crisp at any density with no PNG export
      step. Coordinates are the source SVG's (a 512x512 viewBox, chevron
      group translated to 106,116) scaled down by 108/512 to fit this

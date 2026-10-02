@@ -331,7 +331,7 @@ version conflict), send me the error and I'll fix it directly.
 `res/drawable/ic_launcher.xml` (the launcher icon) and `tv_banner.xml`
 (the Android TV home-screen row banner) now carry the real logo — the
 same chevron mark and "VYZN" wordmark used on the web app
-(`media-server/public/assets/vyzn-mark.svg` and `vyzn-logo.svg`), redrawn
+(`public/assets/vyzn-mark.svg` and `vyzn-logo.svg`), redrawn
 as VectorDrawables rather than imported as PNGs: both source SVGs draw
 everything as plain paths (no filters/gradients/text — well, the wordmark
 SVG's "v0.2" bit *is* real SVG text, which VectorDrawable can't express,
