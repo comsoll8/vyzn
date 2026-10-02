@@ -44,16 +44,16 @@
          narrow/portrait screens), without a hardcoded pixel offset between
          pieces getting out of sync. -->
     <div class="app-nav">
-      <div id="scan-progress-bar" class="scan-progress-bar hidden">
-        <div id="scanProgressFill" class="scan-progress-fill"></div>
-        <span id="scanProgressText" class="scan-progress-text"></span>
-      </div>
-
       <header class="topbar">
         <button id="navMenuBtn" class="hamburger-btn" type="button" aria-label="Menu" aria-expanded="false">
           <span></span><span></span><span></span>
         </button>
-        <img src="/assets/vyzn-mark.svg" alt="VYZN" class="topbar-logo" />
+        <!-- Swapped to vyzn-mark-scanning.svg (pulsing) for the duration of
+             a library scan by showScanProgress()/hideScanProgress() in
+             app.js — see settingsScanProgressWrap below for the actual
+             percent/stage text, which now lives in Settings instead of a
+             bar across the top of every page. -->
+        <img id="topbarLogo" src="/assets/vyzn-mark.svg" alt="VYZN" class="topbar-logo" />
         <div class="topbar-spacer"></div>
 
         <!-- Genre quick-filter: collapsed into a single floating pill next
@@ -181,6 +181,17 @@
         <p class="settings-hint">Backfill Genres re-fetches genre tags for movies/shows that were already matched before genre shelves existed — it doesn't touch titles, posters or anything else.</p>
         <div id="settingsScanInfo" class="settings-info"></div>
 
+        <!-- Live scan progress, moved here from a bar across the top of
+             every page — hidden except while a scan/retry/backfill is
+             actually running (toggled in showScanProgress/hideScanProgress,
+             app.js). -->
+        <div id="settingsScanProgressWrap" class="settings-scan-progress-wrap hidden">
+          <div class="mini-progress-bar">
+            <div id="settingsScanProgressFill" class="mini-progress-fill"></div>
+          </div>
+          <span id="settingsScanProgressText" class="mini-progress-text"></span>
+        </div>
+
         <div class="settings-subrow">
           <input id="purgeInput" type="text" placeholder="Path contains e.g. /.Trash- or /Downloads/" autocomplete="off" />
           <button id="purgeBtn" class="btn-secondary">Purge matching</button>
@@ -193,9 +204,11 @@
       </section>
 
       <section class="settings-section">
-        <h3>Unmatched items <span id="unmatchedCount" class="count-badge"></span></h3>
-        <p class="settings-hint">Items with no TMDB match yet. Adjust the search title or media type and retry, or purge a file that shouldn't be in the library at all.</p>
-        <div id="unmatchedList" class="unmatched-list"></div>
+        <h3>Unmatched items</h3>
+        <p class="settings-hint">Items with no TMDB match yet. Moved to its own page since the list can get long.</p>
+        <button id="openUnmatchedBtn" class="btn-secondary">
+          View Unmatched <span id="unmatchedCount" class="count-badge"></span>
+        </button>
       </section>
 
       <section class="settings-section">
@@ -269,6 +282,19 @@
           <button id="tailscaleDisconnectBtn" class="btn-secondary hidden">Disconnect</button>
         </div>
       </section>
+    </div>
+  </div>
+
+  <!-- Unmatched items: its own page (opened from Settings > Library) rather
+       than a section inline in Settings, which got very crowded once a
+       library had hundreds of unmatched items. Closing it returns to
+       Settings rather than exiting all the way out. -->
+  <div id="unmatchedOverlay" class="show-detail-overlay hidden">
+    <div class="show-detail-box settings-box">
+      <button id="closeUnmatched" class="close-btn" aria-label="Close">&times;</button>
+      <h2>Unmatched items <span id="unmatchedOverlayCount" class="count-badge"></span></h2>
+      <p class="settings-hint">Items with no TMDB match yet. Adjust the search title or media type and retry, or purge a file that shouldn't be in the library at all.</p>
+      <div id="unmatchedList" class="unmatched-list"></div>
     </div>
   </div>
 

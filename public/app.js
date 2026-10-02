@@ -24,8 +24,8 @@ const PROFILE_KEY = 'media-server:profileId';
 // .app-nav's real rendered height, so the Home hero can pull itself up
 // underneath the now-transparent floating topbar by exactly the right
 // amount. A ResizeObserver (rather than hooking every individual thing
-// that can change that height — the scan-progress bar appearing, the
-// topbar wrapping to 2 lines on a narrow/portrait screen, the window
+// that can change that height — the topbar wrapping to 2 lines on a
+// narrow/portrait screen, the window
 // resizing) reacts to all of them uniformly, including the very first
 // layout once the profile gate hides and .app-nav goes from 0 height to
 // its real size.
@@ -67,9 +67,12 @@ const searchEl = document.getElementById('search');
 // in Control Center only (ccRescanBtn/ccScanInfoEl below, ccSettingsBtn),
 // so those old refs are gone; every place that used to touch them now
 // touches the Control Center versions instead.
-const scanProgressBarEl = document.getElementById('scan-progress-bar');
-const scanProgressFillEl = document.getElementById('scanProgressFill');
-const scanProgressTextEl = document.getElementById('scanProgressText');
+const topbarLogoEl = document.getElementById('topbarLogo');
+const settingsScanProgressWrapEl = document.getElementById('settingsScanProgressWrap');
+const settingsScanProgressFillEl = document.getElementById('settingsScanProgressFill');
+const settingsScanProgressTextEl = document.getElementById('settingsScanProgressText');
+const TOPBAR_LOGO_IDLE_SRC = '/assets/vyzn-mark.svg';
+const TOPBAR_LOGO_SCANNING_SRC = '/assets/vyzn-mark-scanning.svg';
 const controlCenterBtn = document.getElementById('controlCenterBtn');
 const activeProfileNameEl = document.getElementById('activeProfileName');
 const appSwitcherBtn = document.getElementById('appSwitcherBtn');
@@ -146,6 +149,13 @@ const settingsNewProfileChildEl = document.getElementById('settingsNewProfileChi
 const settingsSystemInfoEl = document.getElementById('settingsSystemInfo');
 const unmatchedListEl = document.getElementById('unmatchedList');
 const unmatchedCountEl = document.getElementById('unmatchedCount');
+const unmatchedOverlayCountEl = document.getElementById('unmatchedOverlayCount');
+// Unmatched items used to be a section inline in Settings — now its own
+// page, opened from the "View Unmatched" button there (openUnmatchedBtn)
+// and closed back to Settings (not all the way out) by closeUnmatched.
+const unmatchedOverlayEl = document.getElementById('unmatchedOverlay');
+const openUnmatchedBtn = document.getElementById('openUnmatchedBtn');
+const closeUnmatchedBtn = document.getElementById('closeUnmatched');
 const configFormEl = document.getElementById('configForm');
 const configSaveStatusEl = document.getElementById('configSaveStatus');
 const tailscaleStatusEl = document.getElementById('tailscaleStatus');
@@ -367,6 +377,7 @@ window.addEventListener('popstate', () => {
   hideShowDetailInternal();
   hidePlayerInternal();
   hideSettingsInternal();
+  hideUnmatchedInternal();
   hideControlCenterInternal();
   hideAppSwitcherInternal();
   hideNavMenuInternal();
@@ -2823,7 +2834,7 @@ ccRescanBtn.addEventListener('click', async () => {
   ccScanInfoEl.textContent = 'Starting scan...';
   connectScanProgress();
   await fetch('/api/scan', { method: 'POST' });
-  ccScanInfoEl.textContent = 'Scan started — progress shown at the top of the page.';
+  ccScanInfoEl.textContent = 'Scan started — watch the logo, or open Settings for progress.';
   ccRescanBtn.disabled = false;
 });
 
@@ -3068,15 +3079,22 @@ async function pollScanStatus() {
 
 let scanEventSource = null;
 
+// No more bar across the top of every page — a scan in progress is shown
+// by swapping the topbar logo to its pulsing variant (visible everywhere,
+// unobtrusive) plus the actual percent/stage text inside Settings > Library
+// (settingsScanProgressWrap), where it's only in the way of someone who
+// already went looking for it.
 function showScanProgress(percent, text) {
-  scanProgressBarEl.classList.remove('hidden');
-  scanProgressFillEl.style.width = `${Math.max(0, Math.min(100, percent))}%`;
-  scanProgressTextEl.textContent = text;
+  topbarLogoEl.src = TOPBAR_LOGO_SCANNING_SRC;
+  settingsScanProgressWrapEl.classList.remove('hidden');
+  settingsScanProgressFillEl.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+  settingsScanProgressTextEl.textContent = text;
 }
 
 function hideScanProgress() {
-  scanProgressBarEl.classList.add('hidden');
-  scanProgressFillEl.style.width = '0%';
+  topbarLogoEl.src = TOPBAR_LOGO_IDLE_SRC;
+  settingsScanProgressWrapEl.classList.add('hidden');
+  settingsScanProgressFillEl.style.width = '0%';
 }
 
 function stageLabel(stage) {
@@ -3510,16 +3528,22 @@ function unmatchedRow(item) {
   return row;
 }
 
+// Keeps both badges in sync: the one on Settings' "View Unmatched" button
+// and the one in the Unmatched page's own heading.
+function setUnmatchedCount(n) {
+  unmatchedCountEl.textContent = String(n);
+  unmatchedOverlayCountEl.textContent = String(n);
+}
+
 function updateUnmatchedCount(delta) {
   const current = parseInt(unmatchedCountEl.textContent || '0', 10) || 0;
-  const next = Math.max(0, current + delta);
-  unmatchedCountEl.textContent = String(next);
+  setUnmatchedCount(Math.max(0, current + delta));
 }
 
 async function loadUnmatchedList() {
   unmatchedListEl.innerHTML = '<p class="empty-state" style="padding:20px 0;">Loading...</p>';
   const items = await fetchJson('/api/library/unmatched');
-  unmatchedCountEl.textContent = String(items.length);
+  setUnmatchedCount(items.length);
   if (items.length === 0) {
     unmatchedListEl.innerHTML = '<p class="settings-hint">Everything is matched.</p>';
     return;
@@ -3543,7 +3567,7 @@ settingsScanBtn.addEventListener('click', async () => {
   ccRescanBtn.disabled = true;
   connectScanProgress();
   await fetch('/api/scan', { method: 'POST' });
-  settingsScanInfoEl.textContent = 'Scan started — progress shown at the top of the page.';
+  settingsScanInfoEl.textContent = 'Scan started — see progress below.';
 });
 
 settingsRetryBtn.addEventListener('click', async () => {
@@ -3554,7 +3578,7 @@ settingsRetryBtn.addEventListener('click', async () => {
     const res = await fetch('/api/library/retry-unmatched', { method: 'POST' });
     const data = await res.json();
     settingsScanInfoEl.textContent = data.candidates !== undefined
-      ? `Retrying ${data.candidates} unmatched item(s) — progress shown at the top of the page.`
+      ? `Retrying ${data.candidates} unmatched item(s) — see progress below.`
       : (data.error || 'Started.');
   } finally {
     settingsRetryBtn.disabled = false;
@@ -3569,7 +3593,7 @@ settingsBackfillGenresBtn.addEventListener('click', async () => {
     const res = await fetch('/api/library/backfill-genres', { method: 'POST' });
     const data = await res.json();
     settingsScanInfoEl.textContent = data.candidates !== undefined
-      ? `Backfilling genres for ${data.candidates} item(s) — progress shown at the top of the page.`
+      ? `Backfilling genres for ${data.candidates} item(s) — see progress below.`
       : (data.error || 'Started.');
   } finally {
     settingsBackfillGenresBtn.disabled = false;
@@ -3643,6 +3667,31 @@ function closeSettings() {
 closeSettingsBtn.addEventListener('click', closeSettings);
 settingsOverlayEl.addEventListener('click', (e) => {
   if (e.target === settingsOverlayEl) closeSettings();
+});
+
+// Unmatched items: its own page over Settings rather than a pushed history
+// entry of its own — it shares Settings' entry, so a hardware/browser back
+// press exits both at once (same as it already did for Settings alone),
+// while the X button here specifically returns to Settings rather than
+// exiting all the way out.
+function hideUnmatchedInternal() {
+  unmatchedOverlayEl.classList.add('hidden');
+}
+
+function openUnmatched() {
+  settingsOverlayEl.classList.add('hidden');
+  unmatchedOverlayEl.classList.remove('hidden');
+}
+
+function closeUnmatched() {
+  hideUnmatchedInternal();
+  settingsOverlayEl.classList.remove('hidden');
+}
+
+openUnmatchedBtn.addEventListener('click', openUnmatched);
+closeUnmatchedBtn.addEventListener('click', closeUnmatched);
+unmatchedOverlayEl.addEventListener('click', (e) => {
+  if (e.target === unmatchedOverlayEl) closeUnmatched();
 });
 
 // Watch for progress from a scan already running (e.g. triggered from

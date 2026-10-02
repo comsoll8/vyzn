@@ -103,16 +103,26 @@ html { scrollbar-color: rgba(var(--accent-rgb), 0.5) transparent; }
   z-index: 20;
 }
 
-/* --- Scan progress bar ------------------------------------------------- */
+/* --- Scan progress (Settings > Library) --------------------------------
+   Used to be a bar spanning the top of every page; now it's just the
+   topbar logo switching to a pulsing variant (vyzn-mark-scanning.svg, see
+   app.js) plus this small inline progress readout inside Settings, where
+   the percent/stage text is actually useful to someone who went looking
+   for it. */
 
-.scan-progress-bar {
-  height: 26px;
+.settings-scan-progress-wrap {
+  margin-top: 10px;
+}
+
+.mini-progress-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
   background: var(--bg-elevated);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 
-.scan-progress-fill {
+.mini-progress-fill {
   position: absolute;
   inset: 0;
   width: 0%;
@@ -120,16 +130,11 @@ html { scrollbar-color: rgba(var(--accent-rgb), 0.5) transparent; }
   transition: width 0.3s var(--ease);
 }
 
-.scan-progress-text {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  height: 100%;
-  padding: 0 14px;
+.mini-progress-text {
+  display: block;
+  margin-top: 6px;
   font-size: 12px;
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  color: var(--text-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
