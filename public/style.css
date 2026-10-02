@@ -1210,15 +1210,27 @@ body.detail-open { overflow: hidden; }
 
 .card .poster-wrap {
   position: relative;
-  aspect-ratio: 2 / 3;
   background: #232323;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: hidden;
+  /* aspect-ratio (used here previously) isn't supported by the System
+     WebView build on at least some Android TV boxes — the box silently
+     collapses to whatever height the fallback layout gives it instead of
+     a proper 2:3 poster shape, which is what was actually behind the
+     "tiles/posters look cut off" reports: the posters themselves were
+     being rendered squashed/short, not clipped by a layout overlap. This
+     is the classic pre-aspect-ratio padding-percentage trick instead —
+     height: 0 plus a bottom padding set as a percentage of the box's own
+     WIDTH (how percentage padding is always defined, even vertical
+     padding) reliably reserves a 2:3-shaped box in every browser engine,
+     no matter how old. The image and the no-poster placeholder are then
+     both absolutely positioned to fill that box exactly. */
+  height: 0;
+  padding-bottom: 150%; /* 3/2 expressed as a percentage, for a 2:3 (width:height) box */
 }
 
 .card img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -1226,6 +1238,13 @@ body.detail-open { overflow: hidden; }
 }
 
 .card .no-poster {
+  /* .poster-wrap is no longer a flex container (see above), so this
+     centers itself directly over the reserved 2:3 box instead. */
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-dim);
   font-size: 12px;
   padding: 8px;
@@ -1370,12 +1389,17 @@ body.detail-open { overflow: hidden; }
   position: relative;
   flex: 0 0 160px;
   width: 160px;
-  aspect-ratio: 16 / 9;
+  /* See .card .poster-wrap for why this is the padding-percentage trick
+     instead of aspect-ratio: not supported by some Android TV WebView
+     builds, which silently collapses the box instead of reserving 16:9
+     of space. */
+  height: 0;
+  padding-bottom: 56.25%; /* 9/16 */
   background: #232323;
   border-radius: 6px;
   overflow: hidden;
 }
-.episode-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.episode-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 
 .episode-meta { flex: 1; min-width: 0; }
 .episode-title-row {
@@ -1886,7 +1910,9 @@ select:focus-visible,
 .trailer-modal-frame-wrap {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  /* See .card .poster-wrap — aspect-ratio fallback for older WebViews. */
+  height: 0;
+  padding-bottom: 56.25%; /* 16:9 */
   border-radius: var(--card-radius);
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
@@ -1948,7 +1974,9 @@ select:focus-visible,
   position: relative;
   flex: 0 0 220px;
   width: 220px;
-  aspect-ratio: 16 / 10;
+  /* See .card .poster-wrap — aspect-ratio fallback for older WebViews. */
+  height: 0;
+  padding-bottom: 62.5%; /* 10/16 */
   border-radius: 16px;
   overflow: hidden;
   background: var(--bg-elevated) center / cover no-repeat;
@@ -2232,14 +2260,17 @@ select:focus-visible,
 .up-next-cancel:hover { background: rgba(0, 0, 0, 0.65); }
 
 .up-next-thumb {
+  position: relative;
   flex: 0 0 96px;
   width: 96px;
-  aspect-ratio: 16 / 9;
+  /* See .card .poster-wrap — aspect-ratio fallback for older WebViews. */
+  height: 0;
+  padding-bottom: 56.25%; /* 16:9 */
   border-radius: 8px;
   overflow: hidden;
   background: #232323;
 }
-.up-next-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.up-next-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 
 .up-next-info { flex: 1; min-width: 0; }
 .up-next-label {
