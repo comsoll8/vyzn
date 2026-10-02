@@ -44,12 +44,15 @@
      overlap, that same fading region now paints *over* the top of the
      first shelf (the hero is a higher stacking context — position: fixed
      — than the plain in-flow .rows, so it wins by default), giving a
-     soft blend instead of a hard cut. Modest on purpose: the hero itself
-     has pointer-events: none (only .hero-content opts back in — see
-     below), so this band stays fully clickable on the cards underneath;
-     too large an overlap would still just look odd rather than break
-     anything. */
-  --hero-row-overlap: 64px;
+     soft blend instead of a hard cut.
+     Was 64px — on a real TV, with the first shelf's cards rendered much
+     taller (see .shelf-track .card at larger breakpoints) than on a
+     phone/desktop window, that "modest" 64px turned out to visibly eat
+     into the top of the poster artwork across the whole row — reported
+     as posters looking cut off right under the hero. Keeping this small
+     is what matters, not the exact number; it only needs to be enough to
+     avoid a hard color seam, not full artwork. */
+  --hero-row-overlap: 18px;
   /* Multiplies every backdrop-filter blur radius below (each one reads
      `blur(calc(Npx * var(--glass-blur-scale)))`) so blur can be switched
      off globally in one place. Stays 1 (full glass effect) everywhere
