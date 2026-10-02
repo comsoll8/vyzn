@@ -104,6 +104,39 @@
   padding-bottom: max(20px, 6vh);
 }
 
+/* --- Smaller hero on TV ---------------------------------------------------
+   The base --hero-height clamp (56vh, capped 420-720px) plus the full-size
+   title/meta/description was designed sitting next to a desktop/mobile
+   window, where there's always more vertical space below the fold to
+   scroll into. On a real TV, viewed from a couch at 10-ft distances, that
+   same hero eats a much bigger share of the usable screen and pushes the
+   first shelf mostly (sometimes entirely) below the visible area — reported
+   as posters/rows looking cut off. Shrinking the hero height and the text
+   inside it directly on .tv-app (set on <html>, so --hero-height cascades
+   down into both .hero and .rows, which both read it) gives the first
+   shelf real room on-screen without relying on scrolling to reach it. */
+.tv-app {
+  --hero-height: clamp(280px, 38vh, 460px);
+}
+.tv-app .hero-content {
+  padding: 0 40px 16px;
+  max-width: 720px;
+}
+.tv-app .hero-content h2 {
+  font-size: 32px;
+  margin: 0 0 8px;
+}
+.tv-app .hero-meta {
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+.tv-app .hero-content p {
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0 0 10px;
+  -webkit-line-clamp: 2;
+}
+
 * { box-sizing: border-box; }
 
 body {
