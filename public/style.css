@@ -169,7 +169,23 @@
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  /* NOT justify-content: center — this is exactly what brought back the
+     "genre title cut off" bug. When a shelf's actual content (title +
+     track) is taller than the 100% slot it's given (which happens
+     whenever .rows ends up shorter than one shelf, e.g. after making the
+     hero bigger again), a centered flex column overflows its container
+     symmetrically on BOTH sides, not just the bottom — pushing the title
+     up past .rows' own top edge and back into the hero's overlap/clip
+     zone we specifically fixed earlier. Default (flex-start) keeps the
+     title pinned to the top no matter how tall the content gets; only
+     the bottom ever overflows, which is fine — that's just "this shelf
+     needs scrolling to see all of it", not clipping. */
+}
+
+/* Poster art alone is enough on TV — no title/year overlay needed. (Also
+   means one less thing to fit, now that cards are down to 105px.) */
+.tv-app .card .card-info {
+  display: none;
 }
 
 * { box-sizing: border-box; }
