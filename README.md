@@ -1097,6 +1097,34 @@ playback works before wiring up Docker or the TV app.
 4. Check it's alive: `curl http://<unraid-ip>:18080/health`
 5. Trigger a scan: `curl -X POST http://<unraid-ip>:18080/api/scan`
 
+### Installing on someone else's Unraid box (no source clone needed)
+
+For a box you're setting up for someone else rather than developing on,
+skip the git clone entirely and install the already-built image from GHCR
+instead — either of these two ways:
+
+**A) Plain docker-compose file.** Copy `docker-compose.ghcr.yml` to their
+Unraid box as `docker-compose.yml`, edit the two `volumes:` paths and
+`TZ`, then `docker compose up -d`. No build step, no source code on their
+box at all.
+
+**B) Unraid's Apps tab (Community Applications), private template.** This
+repo isn't published to the public CA store (not meant for strangers to
+install), but you can add it as your own private template source:
+
+1. On their Unraid box: **Apps** tab > **Settings** (top right) >
+   **Template Repositories**.
+2. Add `https://github.com/comsoll8/vyzn` and save.
+3. Back in the Apps tab, search "vyzn" — it now shows up with the real
+   icon, description, and a proper settings form (same fields as the
+   compose file, with hints), exactly like any other CA app.
+4. Install, fill in the Media Library and App Data paths for their box,
+   and go.
+
+The template lives at `unraid-template/vyzn.xml` in this repo — keep it
+in sync with `docker-compose.ghcr.yml` if either one's ports/volumes/env
+vars change, since they describe the same container two different ways.
+
 ### Updating
 
 ```bash

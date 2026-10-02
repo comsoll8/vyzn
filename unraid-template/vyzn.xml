@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<!--
+  Unraid Docker template for VYZN — not submitted to the public Community
+  Applications store (this is a personal project, not meant for strangers
+  to install). To use it: in Unraid, go to Apps > Settings > "Template
+  Repositories" and add:
+
+      https://github.com/comsoll8/vyzn
+
+  Save, then VYZN shows up in the Apps tab's search like any other app —
+  proper icon, WebUI button, update checks — but only for people who've
+  added that repo URL themselves. See README.md's "Installing via Unraid
+  Community Applications" section for the full walkthrough.
+-->
+<Container version="2">
+  <Name>vyzn</Name>
+  <Repository>ghcr.io/comsoll8/vyzn:latest</Repository>
+  <Registry>https://github.com/comsoll8/vyzn/pkgs/container/vyzn</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/comsoll8/vyzn/issues</Support>
+  <Project>https://github.com/comsoll8/vyzn</Project>
+  <Overview>VYZN is a self-hosted media server: scans a folder of movies/TV
+for video files, indexes them with TMDB metadata (full Show -> Season ->
+Episode hierarchy for TV), and serves them as HLS streams to a browser or
+the companion Android TV app. Includes profiles with content-rating gating,
+Continue Watching, genre shelves, hardware (VAAPI) transcoding, optional
+Seerr-backed recommendations/requests, and optional Tailscale for remote
+access — all configurable after install from Control Center > Settings in
+the app itself, no need to edit this template again.</Overview>
+  <Category>MediaServer:Video</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/comsoll8/vyzn/main/unraid-template/vyzn.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/comsoll8/vyzn/main/public/assets/favicon-256.png</Icon>
+  <ExtraParams>--cap-add=NET_ADMIN</ExtraParams>
+  <DonateText/>
+  <DonateLink/>
+  <Date/>
+  <Description>VYZN is a self-hosted media server: scans a folder of
+movies/TV for video files, indexes them with TMDB metadata, and serves
+them as HLS streams to a browser or the companion Android TV app.</Description>
+
+  <!-- Ports -->
+  <Config Name="WebUI Port" Target="8080" Default="18080" Mode="tcp" Description="Port the web UI / stream server listens on" Type="Port" Display="always" Required="true" Mask="false">18080</Config>
+
+  <!-- Paths -->
+  <Config Name="Media Library" Target="/media" Default="/mnt/user/Media" Mode="ro" Description="Your movies/TV folder(s) — read-only, VYZN never writes here" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/Media</Config>
+  <Config Name="App Data" Target="/config" Default="/mnt/user/appdata/vyzn" Mode="rw" Description="Database, settings and logs — this is what to back up" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/vyzn</Config>
+  <Config Name="Transcode Cache" Target="/transcode" Default="/mnt/user/appdata/vyzn/transcode" Mode="rw" Description="Scratch space for HLS transcoding — safe to clear, not a backup target" Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/vyzn/transcode</Config>
+  <Config Name="Theme Music" Target="/app/public/theme-music" Default="/mnt/user/appdata/vyzn/theme-music" Mode="rw" Description="Optional: drop a show's theme song in here as {tmdb_id}.mp3 and it plays on the Show Detail page" Type="Path" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/vyzn/theme-music</Config>
+
+  <!-- Devices -->
+  <Config Name="GPU (QuickSync)" Target="/dev/dri" Default="/dev/dri" Mode="rw" Description="Intel iGPU passthrough for hardware transcoding — remove this device if your box has no Intel iGPU" Type="Device" Display="advanced" Required="false" Mask="false">/dev/dri</Config>
+  <Config Name="Tailscale TUN" Target="/dev/net/tun" Default="/dev/net/tun" Mode="rw" Description="Lets the container create its own VPN network interface for the optional Tailscale remote-access feature" Type="Device" Display="advanced" Required="false" Mask="false">/dev/net/tun</Config>
+
+  <!-- Environment: core, user-facing -->
+  <Config Name="Timezone" Target="TZ" Default="UTC" Mode="" Description="e.g. Australia/Adelaide — see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" Type="Variable" Display="always" Required="true" Mask="false">UTC</Config>
+  <Config Name="Hardware Transcoding" Target="HW_TRANSCODE" Default="false" Mode="" Description="true to use the Intel iGPU (VAAPI) for HLS encoding; false falls back to CPU (libx264)" Type="Variable" Display="always" Required="false" Mask="false">false</Config>
+
+  <!-- Environment: internal, must match the Path configs above — advanced/locked so a template edit doesn't accidentally desync them -->
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="Matches Unraid's default nobody user" Type="Variable" Display="advanced" Required="true" Mask="false">99</Config>
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Matches Unraid's default users group" Type="Variable" Display="advanced" Required="true" Mask="false">100</Config>
+  <Config Name="Media Dir (internal)" Target="MEDIA_DIR" Default="/media" Mode="" Description="Must match the Media Library path's container target above" Type="Variable" Display="advanced" Required="true" Mask="false">/media</Config>
+  <Config Name="Data Dir (internal)" Target="DATA_DIR" Default="/config" Mode="" Description="Must match the App Data path's container target above" Type="Variable" Display="advanced" Required="true" Mask="false">/config</Config>
+  <Config Name="Transcode Dir (internal)" Target="TRANSCODE_DIR" Default="/transcode" Mode="" Description="Must match the Transcode Cache path's container target above" Type="Variable" Display="advanced" Required="true" Mask="false">/transcode</Config>
+  <Config Name="VAAPI Driver" Target="LIBVA_DRIVER_NAME" Default="iHD" Mode="" Description="iHD for Broadwell (2015+) and newer Intel iGPUs; i965 for older ones" Type="Variable" Display="advanced" Required="false" Mask="false">iHD</Config>
+
+  <!-- Environment: optional, usually left unset here and configured from
+       Control Center > Settings in the app instead (saved to the server's
+       own database, takes effect immediately, no restart needed). -->
+  <Config Name="TMDB API Key" Target="TMDB_API_KEY" Default="" Mode="" Description="Optional here — can also be set from Control Center > Settings after install. v3 key from themoviedb.org/settings/api" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="Seerr URL" Target="SEERR_URL" Default="" Mode="" Description="Optional — enables recommendations/requests via a Jellyseerr/Overseerr instance. e.g. http://192.168.1.50:5055" Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+  <Config Name="Seerr API Key" Target="SEERR_API_KEY" Default="" Mode="" Description="Optional — from Jellyseerr/Overseerr Settings > General > API Key" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+</Container>
