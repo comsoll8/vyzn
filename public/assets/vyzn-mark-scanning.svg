@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%" fill="none">
+  <!-- Animated variant of vyzn-mark.svg, swapped in by app.js (showScanProgress/
+       hideScanProgress) for the duration of a library scan — see the
+       .topbar-logo img's src toggling in app.js. Kept as its own file rather
+       than a class toggle on the static mark because the animation is CSS
+       defined inside this SVG document itself (keyframes below), which runs
+       correctly even when the file is loaded via a plain <img src="...">. -->
+  <defs>
+    <style>
+      @keyframes neonPulse {
+        0%, 100% {
+          opacity: 0.25;
+          stroke-width: 14;
+          filter: drop-shadow(0 0 0px rgba(245, 245, 247, 0));
+        }
+        50% {
+          opacity: 1;
+          stroke-width: 20;
+          filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.9));
+        }
+      }
+
+      @keyframes lineSweep {
+        0%, 100% {
+          opacity: 0.2;
+          stroke-dashoffset: 200;
+        }
+        50% {
+          opacity: 1;
+          stroke-dashoffset: 0;
+        }
+      }
+
+      .pulse-outer {
+        animation: neonPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+
+      .pulse-core {
+        animation: neonPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite 0.3s;
+      }
+
+      .pulse-line {
+        stroke-dasharray: 110;
+        animation: lineSweep 2s ease-in-out infinite 0.6s;
+      }
+    </style>
+  </defs>
+
+  <!-- Deep Obsidian Slate Background -->
+  <rect width="512" height="512" rx="128" fill="#0C0C0E" stroke="#1C1C1E" stroke-width="4" />
+
+  <!-- Animated Neon Chevron Group -->
+  <g transform="translate(106, 116)" stroke="#F5F5F7" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Outer Echo Chevron (Phased Pulse) -->
+    <path class="pulse-outer" d="M 20 60 L 150 320 L 280 60" stroke-width="14" opacity="0.35" />
+
+    <!-- Core Chevron (Primary Glow Pulse) -->
+    <path class="pulse-core" d="M 60 60 L 150 250 L 240 60" stroke-width="18" />
+
+    <!-- Horizontal Focal Beam (Loading Sweep) -->
+    <line class="pulse-line" x1="95" y1="130" x2="205" y2="130" stroke-width="10" />
+  </g>
+</svg>
