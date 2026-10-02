@@ -143,8 +143,13 @@
    that ends up oversized and limits how much of each row/how many rows
    fit on screen at once. */
 .tv-app .shelf-track .card {
-  flex-basis: 150px;
-  width: 150px;
+  flex-basis: 110px;
+  width: 110px;
+}
+/* Same reasoning for the Movies/TV flat-grid tab's cards — the >=1600px
+   "large screens" rule also bumps .grid up to 200px columns. */
+.tv-app .grid {
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
 }
 
 * { box-sizing: border-box; }
