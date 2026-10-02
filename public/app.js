@@ -797,8 +797,16 @@ function posterCard(item) {
   info.appendChild(titleEl);
   info.appendChild(yearEl);
 
+  // info is a child of posterWrap (not a sibling appended to card)
+  // specifically so its position: absolute overlay (see .card .card-info
+  // in style.css) is anchored to the poster image itself and gets
+  // clipped by posterWrap's own overflow: hidden + rounded corners —
+  // rather than to the bottom of the whole card, which would be wrong
+  // for anything that adds more content below the poster (see the
+  // discovery/search-result card further down, which also has a request
+  // button after it).
+  posterWrap.appendChild(info);
   card.appendChild(posterWrap);
-  card.appendChild(info);
 
   // The "⋮" card menu used to carry Play/More Info/Restart/Remove here,
   // but for a movie that's all fully redundant now: clicking the card
@@ -1168,8 +1176,10 @@ function showCard(show) {
   info.appendChild(titleEl);
   info.appendChild(yearEl);
 
+  // See the movie card above for why info nests inside posterWrap rather
+  // than being appended to card directly.
+  posterWrap.appendChild(info);
   card.appendChild(posterWrap);
-  card.appendChild(info);
 
   // No "⋮" menu here anymore — both actions it used to hold are already
   // redundant with what the card does on its own: clicking it opens Show
@@ -1277,8 +1287,14 @@ function discoveryCard(item) {
     }
   });
 
+  // See the movie card above for why info nests inside posterWrap rather
+  // than being appended to card directly — matters even more here, since
+  // this card also has requestBtn sitting below the poster in normal
+  // flow: anchoring info to card's own bottom (rather than the poster's)
+  // would have floated the title/year overlay in the gap above the
+  // button instead of over the poster artwork where it belongs.
+  posterWrap.appendChild(info);
   card.appendChild(posterWrap);
-  card.appendChild(info);
   card.appendChild(requestBtn);
 
   // Deliberately no hover-preview-into-hero here (unlike posterCard/
