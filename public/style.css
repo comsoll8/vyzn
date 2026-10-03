@@ -1705,6 +1705,22 @@ body.detail-open { overflow: hidden; }
   line-height: 1.4;
 }
 
+/* TMDB attribution (Settings > About), required by their API Terms of
+   Use. Deliberately small and muted, same footnote treatment as every
+   other .settings-hint — VYZN's own branding (logo, name) appears
+   throughout the rest of the app at a far larger size, so this stays the
+   less-prominent mark as their terms require. */
+.tmdb-attribution-logo {
+  display: block;
+  height: 14px;
+  width: auto;
+  margin-bottom: 8px;
+}
+.settings-attribution a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 .unmatched-list {
   display: flex;
   flex-direction: column;
