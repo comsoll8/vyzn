@@ -1399,22 +1399,6 @@ body.detail-open { overflow: hidden; }
 .card-discovery { cursor: default; }
 .card-discovery:hover { transform: none; box-shadow: none; border-color: transparent; }
 
-.not-owned-badge {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 3px 6px;
-  font-size: 10px;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  text-align: center;
-  color: var(--text-dim);
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(calc(6px * var(--glass-blur-scale)));
-  -webkit-backdrop-filter: blur(calc(6px * var(--glass-blur-scale)));
-}
-
 /* Small circular "+" in the top-right corner of a not-yet-owned card's
    poster, replacing the old full-width "+ Add to Library" button that
    used to sit below it — that extra row made a discovery card taller

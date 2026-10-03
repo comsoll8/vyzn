@@ -1323,11 +1323,6 @@ function discoveryCard(item) {
     noPoster.textContent = item.title;
     posterWrap.appendChild(noPoster);
   }
-  const notOwnedBadge = document.createElement('div');
-  notOwnedBadge.className = 'not-owned-badge';
-  notOwnedBadge.textContent = 'Not in library';
-  posterWrap.appendChild(notOwnedBadge);
-
   const info = document.createElement('div');
   info.className = 'card-info';
   const titleEl = document.createElement('p');
