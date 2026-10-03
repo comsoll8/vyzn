@@ -109,7 +109,17 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun setUpPlayer(subtitle: SubtitleInfo?) {
-        val exoPlayer = ExoPlayer.Builder(this).build()
+        // setSeekBack/ForwardIncrementMs are plain ExoPlayer.Builder
+        // methods (part of the base Player API, not a UI resource
+        // attribute), so unlike the PlayerView XML attributes below this
+        // isn't resolved by AAPT at build time — matches the web player's
+        // own 15s "Instant Replay" jump instead of ExoPlayer's 10s/15s-ish
+        // defaults, and is what the stock rewind/fast-forward buttons
+        // (shown via PlayerView's default controller) actually invoke.
+        val exoPlayer = ExoPlayer.Builder(this)
+            .setSeekBackIncrementMs(15000)
+            .setSeekForwardIncrementMs(15000)
+            .build()
         player = exoPlayer
         playerView.player = exoPlayer
         // ExoPlayer/PlayerView's built-in controller is already D-pad

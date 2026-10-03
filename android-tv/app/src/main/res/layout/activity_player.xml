@@ -11,9 +11,6 @@
        stock controller would otherwise show Previous/Next as permanently
        disabled/no-op icons and an unused Shuffle button — dead chrome
        that the web player's own minimalist control row doesn't have.
-     - fastforward/rewind_increment=15000: matches the web player's own
-       "Instant Replay" jump size (15s), rather than ExoPlayer's 10s
-       default.
      - played/scrubber/unplayed/buffered_color: same monochrome white-
        on-translucent-white scrubber as style.css's .player-seek, instead
        of the stock controller's default accent-colored timebar. -->
@@ -30,8 +27,6 @@
     app:show_previous_button="false"
     app:show_next_button="false"
     app:show_shuffle_button="false"
-    app:fastforward_increment="15000"
-    app:rewind_increment="15000"
     app:played_color="#FFFFFFFF"
     app:scrubber_color="#FFFFFFFF"
     app:unplayed_color="#40FFFFFF"
