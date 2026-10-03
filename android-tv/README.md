@@ -262,6 +262,15 @@ that was failing in-browser. For any title whose audio is AAC (5.1, 7.1,
 whatever), this fixes the problem outright: real multichannel PCM out,
 matching what the receiver/TV actually decodes.
 
+**Subtitles** work too, via `GET /api/raw/:id/subtitles` (the same ffmpeg
+text-subtitle extraction `/api/stream` uses for browser playback) handed
+to ExoPlayer as a `MediaItem.SubtitleConfiguration`, toggled on/off with
+`PlayerView`'s own built-in CC button (`show_subtitle_button` in
+`activity_player.xml`) — off by default, same as the web player.
+
+**Up Next auto-advance** (TV episodes) works too — see its own section
+below.
+
 ### What this does NOT do yet: AC-3 / E-AC-3 / DTS / TrueHD
 
 ExoPlayer's core library does not include decoders for these licensed
@@ -300,21 +309,65 @@ AC-3/DTS, it needs (1) above before this feature reaches it.
 
 ### What else is deliberately deferred (v1 scope)
 
-- **Subtitles** — not wired into `PlayerActivity` yet. A title with
-  subtitles still needs them, they just won't show up when played through
-  the native player. Falls back to the WebView player would require
-  detecting this case; for now it's a known gap, not a fallback.
 - **In-player audio track switching** — the native player plays whatever
   track ExoPlayer selects by default (typically the first/default audio
   stream). The web player's "preferred audio language" setting and the
   Audio button in player controls are both browser-player-only right now.
-- **Up Next / recommendations** — closing the native player returns
-  straight to the WebView with no auto-advance-to-next-episode prompt.
+- **End-of-movie / end-of-series "recommendations" grid** — a TV episode
+  with a next episode gets a native "Up Next" card (see below); a movie
+  finishing, or the last episode of a series, doesn't get the web player's
+  poster-grid "What's next?" screen — it just returns to the WebView once
+  playback ends. Building that natively (posters, opening a detail page,
+  Watchlist/Play from inside `PlayerActivity`) is a meaningfully bigger
+  native UI than a single advance-to-next-episode card.
+
+Subtitles and the TV-episode "Up Next" auto-advance were both originally
+listed here too — both have since shipped (see "Native playback" above
+and "Up Next auto-advance" below).
 
 None of these are hard blockers to add later — they're scoped out of this
 first pass specifically so the core problem (5.1 audio actually working)
 shipped without also trying to reach full feature parity with the browser
 player in the same change. Say the word for any of them.
+
+### Up Next auto-advance
+
+A TV episode playing through `PlayerActivity` now gets the same "Up Next"
+behavior as the web player: in the last 15 seconds of the episode
+(`UP_NEXT_TRIGGER_SECONDS`, matching `app.js`'s own constant), it asks the
+backend's existing `GET /api/playback/:mediaId/next` what's next, and if
+there's a next episode, shows a card (poster thumbnail, title, a 10-second
+countdown) over the bottom-right of the video — **Play Now** jumps
+straight there, **Dismiss** lets the current episode just finish. Letting
+the countdown run out auto-advances, same as the web player.
+
+Built entirely in `PlayerActivity.kt` rather than round-tripping through
+the WebView, since there's no WebView visible during native playback to
+hand this off to:
+
+- **No equivalent "N seconds from the end" callback exists on `Player`**,
+  so this polls playback position once a second (`startPostPlaybackWatcher()`)
+  instead of hooking an event, mirroring what `app.js`'s `timeupdate`
+  listener does for the browser player.
+- **Advancing to the next episode** reuses `setUpPlayer()` wholesale —
+  releases the current `ExoPlayer`, swaps `itemId`/`resumeSeconds`
+  (always 0)/`knownDurationSeconds` to the next episode's, re-fetches its
+  subtitle info, and rebuilds, the same sequence `onCreate()` runs for the
+  very first episode. A final progress report for the episode that just
+  ended is sent first (mirrors `onDestroy()`'s close-time report), so
+  Continue Watching reflects it as finished before the next one starts
+  accumulating its own progress.
+- **The thumbnail** is a plain background `Bitmap` fetch (`BitmapFactory.decodeStream`)
+  off the episode's `still_url` (already a full `image.tmdb.org` URL, same
+  as everywhere else TMDB images are used) — no image-loading library
+  needed for one thumbnail.
+- **Only the `type: "episode"` response is handled.** A movie ending, or
+  the last episode of a series, gets `type: "recommendations"` from the
+  same endpoint — see "End-of-movie / end-of-series 'recommendations'
+  grid" above for why that's still deferred. Playback just returns to the
+  WebView once the title ends in that case (and in any other case nothing
+  showed — a lookup failure or timeout), same as before this feature
+  existed.
 
 ### Status
 

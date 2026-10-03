@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Background for the native Up Next card (PlayerActivity) — rounded,
+     slightly-elevated panel over the paused/playing video, matching the
+     web player's own Up Next overlay (glass panel on dark) as closely as
+     plain Android drawables allow without a blur effect. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#E6202020" />
+    <corners android:radius="12dp" />
+</shape>

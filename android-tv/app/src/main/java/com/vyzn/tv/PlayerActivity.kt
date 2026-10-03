@@ -1,11 +1,18 @@
 package com.vyzn.tv
 
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.graphics.BitmapFactory
 import android.util.Log
+import android.view.View
 import android.view.WindowManager
+import android.widget.Button
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
@@ -38,25 +45,49 @@ import java.util.concurrent.Executors
  * it was.
  *
  * v1 scope, deliberately: play/pause/seek, resume position, progress
- * reporting, and subtitles (on/off via PlayerView's built-in CC button —
- * see fetchSubtitleInfo()/setUpPlayer()). Still deferred (going through the
- * browser player today, which is unaffected by any of this): in-player
- * audio track switching, and Up Next/recommendations chaining. See
- * vyzn-tv/README.md.
+ * reporting, subtitles (on/off via PlayerView's built-in CC button — see
+ * fetchSubtitleInfo()/setUpPlayer()), and "Up Next" episode auto-advance
+ * (see startPostPlaybackWatcher()/showUpNext() below — mirrors app.js's
+ * own Up Next card, hitting the same GET /api/playback/:mediaId/next).
+ * Still deferred (going through the browser player today, which is
+ * unaffected by any of this): in-player audio track switching, and the
+ * end-of-movie "recommendations" grid (Up Next only covers the TV-episode
+ * case — see showUpNext()'s comment for why). See android-tv/README.md.
  */
 class PlayerActivity : AppCompatActivity() {
 
     private var player: ExoPlayer? = null
     private lateinit var playerView: PlayerView
+    private lateinit var upNextCard: LinearLayout
+    private lateinit var upNextThumb: ImageView
+    private lateinit var upNextTitle: TextView
+    private lateinit var upNextCountdown: TextView
+    private lateinit var upNextPlayBtn: Button
+    private lateinit var upNextDismissBtn: Button
     private lateinit var progressExecutor: ExecutorService
     private val mainHandler = Handler(Looper.getMainLooper())
     private var progressRunnable: Runnable? = null
+    private var postPlaybackWatcherRunnable: Runnable? = null
+    private var countdownRunnable: Runnable? = null
 
     private var serverBaseUrl: String = ""
     private var itemId: Long = -1
     private var profileId: Long = -1
     private var resumeSeconds: Double = 0.0
     private var knownDurationSeconds: Double = 0.0
+    private var postPlaybackTriggered: Boolean = false
+    private var pendingNextEpisode: NextEpisode? = null
+    private var countdownRemaining: Int = 0
+
+    private data class NextEpisode(
+        val mediaId: Long,
+        val title: String?,
+        val overview: String?,
+        val episodeNumber: Int,
+        val seasonNumber: Int,
+        val stillUrl: String?,
+        val durationSeconds: Double,
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,6 +96,14 @@ class PlayerActivity : AppCompatActivity() {
         hideSystemBars()
 
         playerView = findViewById(R.id.playerView)
+        upNextCard = findViewById(R.id.upNextCard)
+        upNextThumb = findViewById(R.id.upNextThumb)
+        upNextTitle = findViewById(R.id.upNextTitle)
+        upNextCountdown = findViewById(R.id.upNextCountdown)
+        upNextPlayBtn = findViewById(R.id.upNextPlayBtn)
+        upNextDismissBtn = findViewById(R.id.upNextDismissBtn)
+        upNextPlayBtn.setOnClickListener { playNextEpisodeNow() }
+        upNextDismissBtn.setOnClickListener { hideUpNext() } // let the title just finish on its own, same as the web player's Cancel
         progressExecutor = Executors.newSingleThreadExecutor()
 
         serverBaseUrl = intent.getStringExtra(EXTRA_SERVER_BASE_URL) ?: ""
@@ -177,6 +216,15 @@ class PlayerActivity : AppCompatActivity() {
                     val exoDurationMs = exoPlayer.duration
                     if (exoDurationMs > 0) knownDurationSeconds = exoDurationMs / 1000.0
                 }
+                // Covers the case post-playback never fired anything (a
+                // movie — recommendations aren't built natively yet, see
+                // the class doc — or the lookup failed/timed out): rather
+                // than sit on a frozen last frame forever, same as the web
+                // player just tearing its own player down once `ended`
+                // fires with nothing to show, return to the WebView.
+                if (state == Player.STATE_ENDED && upNextCard.visibility != View.VISIBLE) {
+                    finish()
+                }
             }
         })
 
@@ -184,7 +232,196 @@ class PlayerActivity : AppCompatActivity() {
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
 
+        postPlaybackTriggered = false
         startProgressReporting()
+        startPostPlaybackWatcher()
+    }
+
+    // --- "Up Next" episode auto-advance -------------------------------------
+    // Polls playback position the same way the web player's `timeupdate`
+    // handler does (see app.js's UP_NEXT_TRIGGER_SECONDS), since there's no
+    // equivalent event to hook here — ExoPlayer has no built-in "N seconds
+    // from the end" callback. Once within range, asks the same backend
+    // endpoint app.js uses (GET /api/playback/:mediaId/next) what comes
+    // next.
+    private fun startPostPlaybackWatcher() {
+        stopPostPlaybackWatcher()
+        val runnable = object : Runnable {
+            override fun run() {
+                checkForPostPlayback()
+                mainHandler.postDelayed(this, POST_PLAYBACK_POLL_MS)
+            }
+        }
+        postPlaybackWatcherRunnable = runnable
+        mainHandler.postDelayed(runnable, POST_PLAYBACK_POLL_MS)
+    }
+
+    private fun stopPostPlaybackWatcher() {
+        postPlaybackWatcherRunnable?.let { mainHandler.removeCallbacks(it) }
+        postPlaybackWatcherRunnable = null
+    }
+
+    private fun checkForPostPlayback() {
+        if (postPlaybackTriggered) return
+        val exoPlayer = player ?: return
+        val durationMs = if (knownDurationSeconds > 0.0) (knownDurationSeconds * 1000).toLong() else exoPlayer.duration
+        if (durationMs <= 0 || durationMs == C.TIME_UNSET) return
+        val remainingMs = durationMs - exoPlayer.currentPosition
+        if (remainingMs > UP_NEXT_TRIGGER_SECONDS * 1000L) return
+
+        postPlaybackTriggered = true
+        val base = serverBaseUrl
+        val id = itemId
+        val profile = profileId
+        progressExecutor.execute {
+            val next = fetchNextEpisode(base, id, profile)
+            if (next != null) mainHandler.post { showUpNext(next) }
+            // No match (a movie, end of series, lookup failure) — nothing
+            // shown; the STATE_ENDED handler above covers the title just
+            // finishing naturally from here.
+        }
+    }
+
+    // Only the `type === "episode"` case is handled — the TV-episode
+    // auto-advance this was actually asked for. `type === "recommendations"`
+    // (a movie finishing, or the end of a series) is what the web player
+    // shows a poster grid for; building that natively (fetching posters,
+    // opening a detail page, Watchlist/Play from inside PlayerActivity) is
+    // a meaningfully bigger native UI than a single advance-to-next-episode
+    // card, so it's left going through the "just return to the WebView"
+    // path (the STATE_ENDED handler above) rather than half-building it.
+    private fun fetchNextEpisode(base: String, mediaId: Long, profile: Long): NextEpisode? {
+        var connection: HttpURLConnection? = null
+        try {
+            val url = if (profile > 0) {
+                URL("$base/api/playback/$mediaId/next?profile_id=$profile")
+            } else {
+                URL("$base/api/playback/$mediaId/next")
+            }
+            connection = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 5000
+                readTimeout = 5000
+            }
+            if (connection.responseCode != HttpURLConnection.HTTP_OK) return null
+            val body = BufferedReader(InputStreamReader(connection.inputStream)).use { it.readText() }
+            val json = JSONObject(body)
+            if (json.optString("type") != "episode") return null
+            val ep = json.getJSONObject("episode")
+            return NextEpisode(
+                mediaId = ep.getLong("media_id"),
+                title = if (ep.isNull("title")) null else ep.getString("title"),
+                overview = if (ep.isNull("overview")) null else ep.getString("overview"),
+                episodeNumber = ep.optInt("episode_number"),
+                seasonNumber = ep.optInt("season_number"),
+                stillUrl = if (ep.isNull("still_url")) null else ep.getString("still_url"),
+                durationSeconds = if (ep.isNull("duration_seconds")) 0.0 else ep.getDouble("duration_seconds"),
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Up Next lookup failed for item $mediaId", e)
+            return null
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
+    private fun showUpNext(episode: NextEpisode) {
+        pendingNextEpisode = episode
+        val label = "S${episode.seasonNumber}:E${episode.episodeNumber}"
+        upNextTitle.text = if (!episode.title.isNullOrBlank()) "$label — ${episode.title}" else label
+        upNextThumb.setImageDrawable(null)
+        episode.stillUrl?.let { stillUrl ->
+            progressExecutor.execute {
+                val bitmap = fetchBitmap(stillUrl)
+                if (bitmap != null) mainHandler.post {
+                    // Still the pending episode? (card may have been
+                    // dismissed, or playback torn down, while this was
+                    // loading in the background)
+                    if (pendingNextEpisode === episode) upNextThumb.setImageBitmap(bitmap)
+                }
+            }
+        }
+        upNextCard.visibility = View.VISIBLE
+        // Real Android focus (same as the rest of this screen — see
+        // PlayerView's own doc comment above) so the D-pad lands somewhere
+        // visible the instant the card appears, matching the web player
+        // explicitly focusing its own Play/Pause when controls first show.
+        upNextPlayBtn.requestFocus()
+        startUpNextCountdown()
+    }
+
+    private fun startUpNextCountdown() {
+        countdownRemaining = UP_NEXT_COUNTDOWN_SECONDS
+        renderCountdown()
+        countdownRunnable?.let { mainHandler.removeCallbacks(it) }
+        val runnable = object : Runnable {
+            override fun run() {
+                countdownRemaining -= 1
+                renderCountdown()
+                if (countdownRemaining <= 0) {
+                    playNextEpisodeNow()
+                } else {
+                    mainHandler.postDelayed(this, 1000)
+                }
+            }
+        }
+        countdownRunnable = runnable
+        mainHandler.postDelayed(runnable, 1000)
+    }
+
+    private fun renderCountdown() {
+        upNextCountdown.text = "Playing in ${countdownRemaining.coerceAtLeast(0)}s"
+    }
+
+    private fun hideUpNext() {
+        countdownRunnable?.let { mainHandler.removeCallbacks(it) }
+        countdownRunnable = null
+        upNextCard.visibility = View.GONE
+    }
+
+    private fun playNextEpisodeNow() {
+        val episode = pendingNextEpisode ?: return
+        hideUpNext()
+        pendingNextEpisode = null
+
+        // Final progress update for the title that's ending, same as a
+        // normal close (onDestroy()), before itemId moves on to the next
+        // one below.
+        stopProgressReporting()
+        stopPostPlaybackWatcher()
+        reportProgressOnce()
+
+        itemId = episode.mediaId
+        resumeSeconds = 0.0
+        knownDurationSeconds = episode.durationSeconds
+        val label = "S${episode.seasonNumber}:E${episode.episodeNumber}"
+        Toast.makeText(this, if (!episode.title.isNullOrBlank()) "$label — ${episode.title}" else label, Toast.LENGTH_SHORT).show()
+
+        player?.release()
+        player = null
+
+        val base = serverBaseUrl
+        val id = itemId
+        progressExecutor.execute {
+            val subtitle = fetchSubtitleInfo(base, id)
+            mainHandler.post { setUpPlayer(subtitle) }
+        }
+    }
+
+    private fun fetchBitmap(url: String): Bitmap? {
+        var connection: HttpURLConnection? = null
+        return try {
+            connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 5000
+                readTimeout = 5000
+            }
+            connection.inputStream.use { BitmapFactory.decodeStream(it) }
+        } catch (e: Exception) {
+            Log.w(TAG, "Up Next thumbnail fetch failed", e)
+            null
+        } finally {
+            connection?.disconnect()
+        }
     }
 
     // Reports playback position to the server on the same ~15s cadence the
@@ -285,6 +522,8 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         stopProgressReporting()
+        stopPostPlaybackWatcher()
+        countdownRunnable?.let { mainHandler.removeCallbacks(it) }
         reportProgressOnce() // final update on close, mirroring hidePlayerInternal()'s reportProgress() in app.js
         player?.release()
         player = null
@@ -295,6 +534,11 @@ class PlayerActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "VyznPlayer"
         private const val PROGRESS_INTERVAL_MS = 15000L
+        // Matches app.js's UP_NEXT_TRIGGER_SECONDS/UP_NEXT_COUNTDOWN_SECONDS
+        // exactly, so the native and browser players feel the same.
+        private const val UP_NEXT_TRIGGER_SECONDS = 15
+        private const val UP_NEXT_COUNTDOWN_SECONDS = 10
+        private const val POST_PLAYBACK_POLL_MS = 1000L
 
         const val EXTRA_SERVER_BASE_URL = "server_base_url"
         const val EXTRA_ITEM_ID = "item_id"

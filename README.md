@@ -1639,8 +1639,9 @@ entirely, so real multichannel audio reaches the TV/AVR intact. Added here:
 Full detail — what this fixes today (AAC 5.1, which was exactly what was
 failing), what it doesn't yet (AC-3/E-AC-3/DTS/TrueHD, which need
 ExoPlayer's separately-built FFmpeg extension), and what's still deferred
-(in-player audio track switching, Up Next — subtitles shipped in tv-v2) —
-is in `android-tv/README.md`'s "Native playback (ExoPlayer)" section.
+(in-player audio track switching; the end-of-movie "recommendations" grid
+— subtitles and TV-episode Up Next auto-advance have since shipped) — is
+in `android-tv/README.md`'s "Native playback (ExoPlayer)" section.
 
 ### Home screen: static hero banner + decluttered cards
 

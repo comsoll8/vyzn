@@ -1,33 +1,127 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Theming only — no custom controller_layout_id — so this stays within
-     PlayerView's own documented attributes (all stable/public since the
-     original ExoPlayer2 PlayerControlView) rather than depending on the
-     internal view IDs of whatever controller layout media3-ui ships
-     today, which would be far easier to get subtly wrong with no way to
-     test it from here.
-
-     - show_previous_button/show_next_button/show_shuffle_button=false:
-       there's only ever one MediaItem (a single title, no queue), so the
-       stock controller would otherwise show Previous/Next as permanently
-       disabled/no-op icons and an unused Shuffle button — dead chrome
-       that the web player's own minimalist control row doesn't have.
-     - played/scrubber/unplayed/buffered_color: same monochrome white-
-       on-translucent-white scrubber as style.css's .player-seek, instead
-       of the stock controller's default accent-colored timebar. -->
-<androidx.media3.ui.PlayerView xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- FrameLayout wrapper so the Up Next card (added for native playback —
+     see PlayerActivity.kt's showUpNext()) can sit on top of PlayerView as
+     a bottom-right overlay, the same stacking the web player uses for its
+     own #upNextOverlay over the <video> element. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/playerView"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="#000000"
-    app:show_buffering="when_playing"
-    app:resize_mode="fit"
-    app:use_controller="true"
-    app:show_subtitle_button="true"
-    app:show_previous_button="false"
-    app:show_next_button="false"
-    app:show_shuffle_button="false"
-    app:played_color="#FFFFFFFF"
-    app:scrubber_color="#FFFFFFFF"
-    app:unplayed_color="#40FFFFFF"
-    app:buffered_color="#66FFFFFF" />
+    android:layout_height="match_parent">
+
+    <!-- Theming only — no custom controller_layout_id — so this stays within
+         PlayerView's own documented attributes (all stable/public since the
+         original ExoPlayer2 PlayerControlView) rather than depending on the
+         internal view IDs of whatever controller layout media3-ui ships
+         today, which would be far easier to get subtly wrong with no way to
+         test it from here.
+
+         - show_previous_button/show_next_button/show_shuffle_button=false:
+           there's only ever one MediaItem (a single title, no queue), so the
+           stock controller would otherwise show Previous/Next as permanently
+           disabled/no-op icons and an unused Shuffle button — dead chrome
+           that the web player's own minimalist control row doesn't have.
+         - played/scrubber/unplayed/buffered_color: same monochrome white-
+           on-translucent-white scrubber as style.css's .player-seek, instead
+           of the stock controller's default accent-colored timebar. -->
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/playerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        app:show_buffering="when_playing"
+        app:resize_mode="fit"
+        app:use_controller="true"
+        app:show_subtitle_button="true"
+        app:show_previous_button="false"
+        app:show_next_button="false"
+        app:show_shuffle_button="false"
+        app:played_color="#FFFFFFFF"
+        app:scrubber_color="#FFFFFFFF"
+        app:unplayed_color="#40FFFFFF"
+        app:buffered_color="#66FFFFFF" />
+
+    <!-- Up Next card: hidden until the last UP_NEXT_TRIGGER_SECONDS of the
+         title (see PlayerActivity.showUpNext()/startPostPlaybackWatcher()),
+         mirroring app.js's #upNextOverlay both in when it appears and in
+         offering the same two actions (play now / dismiss and let the
+         title just finish). Bottom-right placement, over the video, so it
+         never covers PlayerView's own control bar which anchors bottom-left/
+         center. -->
+    <LinearLayout
+        android:id="@+id/upNextCard"
+        android:layout_width="340dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="32dp"
+        android:orientation="vertical"
+        android:background="@drawable/up_next_card_bg"
+        android:padding="16dp"
+        android:visibility="gone"
+        android:focusable="true"
+        android:focusableInTouchMode="true">
+
+        <TextView
+            android:id="@+id/upNextLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="UP NEXT"
+            android:textColor="@color/vyzn_text_dim"
+            android:textSize="11sp"
+            android:letterSpacing="0.08"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/upNextThumb"
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:layout_marginTop="8dp"
+            android:scaleType="centerCrop"
+            android:background="@color/vyzn_bg_elevated"
+            android:contentDescription="@null" />
+
+        <TextView
+            android:id="@+id/upNextTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:textColor="@color/vyzn_text"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:maxLines="2"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/upNextCountdown"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="@color/vyzn_text_dim"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/upNextPlayBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Play Now"
+                android:textAllCaps="false"
+                android:backgroundTint="@color/vyzn_accent"
+                android:textColor="@color/vyzn_bg" />
+
+            <Button
+                android:id="@+id/upNextDismissBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="Dismiss"
+                android:textAllCaps="false"
+                android:backgroundTint="@color/vyzn_bg_elevated"
+                android:textColor="@color/vyzn_text" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>
