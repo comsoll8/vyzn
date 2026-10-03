@@ -18,7 +18,15 @@ const config = require('./config');
 // Control Center Settings panel takes effect on the very next request,
 // with no restart — see src/config.js.
 function getUrl() {
-  return (config.get('SEERR_URL') || '').replace(/\/+$/, '');
+  const raw = (config.get('SEERR_URL') || '').trim().replace(/\/+$/, '');
+  if (!raw) return '';
+  // fetch() throws "Failed to parse URL" on a schemeless host:port (e.g.
+  // "192.168.1.246:5055", which is exactly what Jellyseerr/Overseerr's own
+  // Settings > General page shows as "the URL" and what people naturally
+  // paste in here) — it needs a protocol to be a valid URL at all. Default
+  // to http:// (same as the rest of this app's own LAN-only setup guide)
+  // rather than making every caller re-derive this.
+  return /^https?:\/\//i.test(raw) ? raw : `http://${raw}`;
 }
 function getApiKey() {
   return config.get('SEERR_API_KEY') || null;
