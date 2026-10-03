@@ -1271,6 +1271,39 @@ function recommendationCard(item) {
   return item.owned ? (item.kind === 'show' ? showCard(item) : posterCard(item)) : discoveryCard(item);
 }
 
+// Fires `onLongPress` after a press (pointer/touch, or Enter/Space on a
+// focused element — covers mouse, touch, and D-pad/keyboard alike) is held
+// on `el` for LONG_PRESS_MS without releasing, moving off, or being
+// interrupted. Used by discoveryCard() so adding an unowned title to the
+// library doesn't require landing precisely on its small "+" button —
+// holding the select button down anywhere on the card does the same
+// thing. Never interferes with a normal short click/Enter, which keeps
+// firing exactly as it already did; this only adds behavior on top of a
+// sustained press.
+const LONG_PRESS_MS = 550;
+function attachLongPress(el, onLongPress) {
+  let timer = null;
+  const start = (e) => {
+    if (timer) return;
+    timer = setTimeout(() => {
+      timer = null;
+      onLongPress(e);
+    }, LONG_PRESS_MS);
+  };
+  const cancel = () => {
+    if (timer) { clearTimeout(timer); timer = null; }
+  };
+  el.addEventListener('pointerdown', start);
+  el.addEventListener('pointerup', cancel);
+  el.addEventListener('pointercancel', cancel);
+  el.addEventListener('pointerleave', cancel);
+  el.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) start(e);
+  });
+  el.addEventListener('keyup', cancel);
+  el.addEventListener('blur', cancel);
+}
+
 function discoveryCard(item) {
   const card = document.createElement('div');
   card.className = 'card card-discovery';
@@ -1306,33 +1339,48 @@ function discoveryCard(item) {
   info.appendChild(titleEl);
   info.appendChild(yearEl);
 
-  const requestBtn = document.createElement('button');
-  requestBtn.type = 'button';
-  requestBtn.className = 'request-btn';
-  // A Seerr *search* hit (unlike a plain recommendation) already knows
-  // whether it's sitting in Seerr's own pending/processing/available
-  // queue — surface that instead of offering to add it again.
-  const setRequestBtnIdle = () => {
-    if (!state.seerrConfigured) {
-      requestBtn.textContent = 'Not in library';
-      requestBtn.disabled = true;
-    } else if (item.already_available) {
-      requestBtn.textContent = 'Already Available';
-      requestBtn.disabled = true;
-    } else if (item.already_requested) {
-      requestBtn.textContent = 'Already Requested';
-      requestBtn.disabled = true;
+  // A small corner "+" on the poster, not a full-width button below it —
+  // that extra row used to make a discovery card taller than every other
+  // card sharing its shelf and needed a separately-aimed click. A Seerr
+  // *search* hit (unlike a plain recommendation) already knows whether
+  // it's sitting in Seerr's own pending/processing/available queue —
+  // surface that instead of offering to add it again.
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'card-add-btn';
+  addBtn.setAttribute('aria-label', 'Add to Library');
+
+  const setAddBtnIdle = () => {
+    // Nothing useful to do yet (no Seerr) or nothing left to request (it's
+    // already fully available) — no button at all rather than a disabled
+    // one, same spirit as the rest of this card only showing controls
+    // that do something.
+    if (!state.seerrConfigured || item.already_available) {
+      addBtn.classList.add('hidden');
+      addBtn.disabled = true;
+      return;
+    }
+    addBtn.classList.remove('hidden');
+    if (item.already_requested) {
+      addBtn.textContent = '✓';
+      addBtn.classList.add('added');
+      addBtn.disabled = true;
+      addBtn.title = 'Already Requested';
     } else {
-      requestBtn.textContent = '+ Add to Library';
-      requestBtn.disabled = false;
+      addBtn.textContent = '+';
+      addBtn.classList.remove('added');
+      addBtn.disabled = false;
+      addBtn.title = 'Add to Library';
     }
   };
-  setRequestBtnIdle();
-  requestBtn.addEventListener('click', async (e) => {
-    e.stopPropagation();
-    if (!state.seerrConfigured || requestBtn.disabled) return;
-    requestBtn.disabled = true;
-    requestBtn.textContent = 'Adding…';
+  setAddBtnIdle();
+
+  let addInFlight = false;
+  async function triggerAdd() {
+    if (addInFlight || addBtn.disabled) return;
+    addInFlight = true;
+    addBtn.disabled = true;
+    addBtn.textContent = '…';
     try {
       const res = await fetch('/api/seerr/request', {
         method: 'POST',
@@ -1341,22 +1389,38 @@ function discoveryCard(item) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Add to Library failed');
-      requestBtn.textContent = data.alreadyRequested ? 'Already Requested' : '✓ Added to Library';
+      addBtn.textContent = '✓';
+      addBtn.classList.add('added');
+      addBtn.title = data.alreadyRequested ? 'Already Requested' : 'Added to Library';
     } catch (err) {
-      requestBtn.textContent = 'Add failed';
-      setTimeout(setRequestBtnIdle, 2500);
+      addBtn.textContent = '!';
+      addBtn.title = err.message || 'Add failed — try again';
+      setTimeout(() => { addInFlight = false; setAddBtnIdle(); }, 2000);
+      return;
     }
+    addInFlight = false;
+  }
+
+  addBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    triggerAdd();
+  });
+  // Long-press anywhere on the card (poster or title) does the same thing
+  // as tapping the small + button — see attachLongPress()'s own comment
+  // above for why this exists.
+  attachLongPress(card, (e) => {
+    e.preventDefault();
+    triggerAdd();
   });
 
   // See the movie card above for why info nests inside posterWrap rather
-  // than being appended to card directly — matters even more here, since
-  // this card also has requestBtn sitting below the poster in normal
-  // flow: anchoring info to card's own bottom (rather than the poster's)
-  // would have floated the title/year overlay in the gap above the
-  // button instead of over the poster artwork where it belongs.
+  // than being appended to card directly. addBtn is also a posterWrap
+  // child (not a card child) so it's positioned relative to the poster
+  // itself — consistent with it now being a corner badge rather than a
+  // block below the poster.
+  posterWrap.appendChild(addBtn);
   posterWrap.appendChild(info);
   card.appendChild(posterWrap);
-  card.appendChild(requestBtn);
 
   // Deliberately no hover-preview-into-hero here (unlike posterCard/
   // showCard): clicking the hero opens Movie/Show Detail for a locally

@@ -1393,7 +1393,9 @@ body.detail-open { overflow: hidden; }
 
 /* Not clickable to a detail/player page like a real library card (there's
    nothing local to open), so no pointer cursor/hover-lift on the card
-   itself — only the "Add to Library" button below is interactive. */
+   itself — the corner "+" button is the click target, and a long-press
+   anywhere on the card (attachLongPress() in app.js) does the same thing
+   without needing to land on it. */
 .card-discovery { cursor: default; }
 .card-discovery:hover { transform: none; box-shadow: none; border-color: transparent; }
 
@@ -1413,22 +1415,40 @@ body.detail-open { overflow: hidden; }
   -webkit-backdrop-filter: blur(calc(6px * var(--glass-blur-scale)));
 }
 
-.request-btn {
-  display: block;
-  width: calc(100% - 20px);
-  margin: 0 10px 10px;
-  padding: 6px 0;
-  border: 1px solid rgba(var(--accent-rgb), 0.5);
-  border-radius: 999px;
-  background: transparent;
+/* Small circular "+" in the top-right corner of a not-yet-owned card's
+   poster, replacing the old full-width "+ Add to Library" button that
+   used to sit below it — that extra row made a discovery card taller
+   than every other card sharing its shelf and needed its own precise
+   click target. Top-right rather than top-left (.watched-badge's corner
+   on an owned card) since this card type never has a watched badge or a
+   "..." menu to collide with. Reachable with one D-pad flick onto the
+   poster then Select — or skip aiming for it entirely and long-press
+   anywhere on the card (see attachLongPress() in app.js). */
+.card-add-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
   color: var(--accent);
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+  z-index: 3;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: background 0.15s var(--ease), transform 0.1s var(--ease-snappy);
 }
-.request-btn:hover:not(:disabled) { background: var(--accent); color: var(--accent-contrast); }
-.request-btn:disabled { opacity: 0.5; cursor: default; border-color: rgba(255, 255, 255, 0.15); color: var(--text-dim); }
+.card-add-btn:hover:not(:disabled), .card-add-btn:focus-visible { background: var(--accent); color: var(--accent-contrast); }
+.card-add-btn:active:not(:disabled) { transform: scale(0.88); }
+.card-add-btn.added { color: var(--accent); }
+.card-add-btn.hidden { display: none; }
 
 .show-detail-overlay {
   position: fixed;
