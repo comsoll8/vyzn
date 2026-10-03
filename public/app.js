@@ -990,46 +990,64 @@ async function renderHome() {
   setHero(heroSource, heroDefaultKind);
 
   renderShelf(rowsEl, 'Continue Watching', continueWatching);
+
+  // Every other row — each "Because you watched X", Trending, and every
+  // genre shelf — goes into one flat list of descriptors that then gets
+  // shuffled as a single set, so the row order isn't "whatever Because You
+  // Watched shelves happen to shuffle among themselves, then always
+  // Trending, then whatever the genres shuffle among themselves" (which is
+  // what two separate shuffles — one per fixed block — would still look
+  // like). Only Continue Watching stays pinned at the very top.
+  const rowDescriptors = [];
   // The server already caps this at 3 (one per each of the last 3 titles
   // actually finished), but capping again here too so Home never grows a
   // 4th+ "Because you watched" row even if that server-side limit ever
   // changes — these are meant to stay a light garnish, not take over Home.
-  for (const shelf of shuffle(recommendations.slice(0, 3))) {
-    renderShelf(rowsEl, `Because you watched ${shelf.basedOn}`, shelf.items, recommendationCard);
+  for (const shelf of recommendations.slice(0, 3)) {
+    rowDescriptors.push({ title: `Because you watched ${shelf.basedOn}`, items: shelf.items, cardBuilder: recommendationCard });
   }
   // Trending now mixes movies and shows (server tags each row with
   // `kind`), so it needs the same dispatching card builder a genre shelf
   // uses rather than the movie-only default.
-  renderShelf(rowsEl, 'Trending', trending, genreMediaCard);
-  await renderGenreShelves(rowsEl, profileId);
+  rowDescriptors.push({ title: 'Trending', items: trending, cardBuilder: genreMediaCard });
+  rowDescriptors.push(...(await genreRowDescriptors(profileId)));
+
+  for (const row of shuffle(rowDescriptors)) {
+    renderShelf(rowsEl, row.title, row.items, row.cardBuilder, row.anchorId);
+  }
 
   if (rowsEl.children.length === 0) {
     rowsEl.innerHTML = '<p class="empty-state">Nothing to show yet — try scanning your library.</p>';
   }
 }
 
-// One horizontal shelf per genre (highest-item-count genres picked first,
-// but then shuffled — see shuffle()'s comment — so it's not always the
-// same genre leading Home), mixing movies and shows. Each shelf's items
-// are already rating-filtered server-side for the active profile, and
-// renderShelf itself skips building a section for a genre a profile's
-// rating limit filtered down to nothing — that's the "auto-hide" behavior.
-async function renderGenreShelves(container, profileId) {
-  if (!state.genres || state.genres.length === 0) return;
-  const top = shuffle(
-    state.genres
-      .slice()
-      .sort((a, b) => b.itemCount - a.itemCount)
-      .slice(0, GENRE_SHELF_LIMIT)
-  );
-
-  for (const genre of top) {
+// Row descriptors (not yet rendered) for the top GENRE_SHELF_LIMIT genres
+// by item count, mixing movies and shows — fetched in parallel rather than
+// renderHome's old one-genre-at-a-time await loop, since nothing here
+// depends on another genre's result. Each shelf's items are already
+// rating-filtered server-side for the active profile; renderShelf itself
+// skips building a section for a genre a profile's rating limit filtered
+// down to nothing — that's the "auto-hide" behavior. Picking the *set* of
+// genres by item count (rather than at random) still makes sense — the
+// genres with barely anything in them are the ones worth leaving out —
+// but which of those picked genres leads Home is exactly what
+// renderHome's shuffle of every row together is for, so this no longer
+// shuffles on its own.
+async function genreRowDescriptors(profileId) {
+  if (!state.genres || state.genres.length === 0) return [];
+  const top = state.genres.slice().sort((a, b) => b.itemCount - a.itemCount).slice(0, GENRE_SHELF_LIMIT);
+  const itemLists = await Promise.all(top.map((genre) => {
     const url = profileId
       ? `/api/genres/${genre.id}/media?profile_id=${profileId}`
       : `/api/genres/${genre.id}/media`;
-    const items = await fetchJson(url);
-    renderShelf(container, genre.name, items, genreMediaCard, `genre-shelf-${genre.id}`);
-  }
+    return fetchJson(url);
+  }));
+  return top.map((genre, i) => ({
+    title: genre.name,
+    items: itemLists[i],
+    cardBuilder: genreMediaCard,
+    anchorId: `genre-shelf-${genre.id}`,
+  }));
 }
 
 function setActiveGenrePill(activeBtn) {
@@ -1042,8 +1060,9 @@ function setActiveGenrePill(activeBtn) {
 // #genreFilterBtn / the dropdown-positioning block below) instead of a
 // full-width bar of pills underneath the topbar. "All" scrolls back to the
 // top of the page, each genre pill smooth-scrolls down to that genre's
-// shelf (built by renderGenreShelves above) — either way the dropdown
-// closes right after, same as picking an item from any other menu here.
+// shelf (built from genreRowDescriptors()'s output, in renderHome) —
+// either way the dropdown closes right after, same as picking an item
+// from any other menu here.
 function renderGenrePills(genres) {
   genrePillsEl.innerHTML = '';
   genreFilterLabelEl.textContent = 'All Genres';
