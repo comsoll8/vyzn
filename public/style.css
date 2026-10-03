@@ -704,16 +704,16 @@ body.detail-open { overflow: hidden; }
   margin-bottom: 16px;
 }
 .genre-tag {
+  /* Informational only (a plain <span>, not a button — see
+     openMovieDetail/openShowDetail in app.js) — no cursor/hover
+     affordance, since there's nothing to click. */
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.18);
   color: var(--text);
   padding: 4px 13px;
   border-radius: 999px;
   font-size: 12px;
-  cursor: pointer;
-  transition: background 0.15s var(--ease);
 }
-.genre-tag:hover { background: rgba(255, 255, 255, 0.22); }
 
 .movie-detail-overview {
   font-size: 15px;

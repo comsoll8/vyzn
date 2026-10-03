@@ -768,8 +768,17 @@ function posterCard(item) {
   // (a TV episode surfaced in Continue Watching/Trending/a genre shelf)
   // keeps the old behavior of playing directly, since episodes have their
   // own browsing surface (Show Detail) rather than a page of their own.
+  //
+  // Exception: a card actually sitting in Continue Watching (it carries
+  // position_seconds/duration_seconds — see attachActionMenu's comment
+  // below for why that pair is exclusive to CW) always plays straight
+  // through instead, movie or not. That's the whole point of picking it
+  // from Continue Watching — Detail would just be a detour back to the
+  // same Play button.
+  const isContinueWatching = Boolean(item.position_seconds && item.duration_seconds);
   card.addEventListener('click', () => {
-    if (isMovie(item)) openMovieDetail(item);
+    if (isContinueWatching) openPlayer(item);
+    else if (isMovie(item)) openMovieDetail(item);
     else openPlayer(item);
   });
   card.addEventListener('mouseenter', () => previewHero(item, 'movie'));
@@ -1644,11 +1653,11 @@ async function openShowDetail(showId) {
 
   if (details.genres && details.genres.length) {
     for (const genre of details.genres) {
-      const tag = document.createElement('button');
-      tag.type = 'button';
+      // Plain text, not a button — see the identical comment in
+      // openMovieDetail for why.
+      const tag = document.createElement('span');
       tag.className = 'genre-tag';
       tag.textContent = genre.name;
-      tag.addEventListener('click', () => goToGenre(genre.id));
       showDetailGenresEl.appendChild(tag);
     }
   }
@@ -1820,25 +1829,6 @@ function castCard(person) {
   card.appendChild(name);
   card.appendChild(character);
   return card;
-}
-
-// Jumps back to the Home genre shelf for a genre tag clicked on the detail
-// page. Closing the detail overlay never touched state.tab/query/scroll in
-// the first place (it's a fixed-position layer on top of everything), so
-// this is the one place that deliberately changes them.
-function goToGenre(genreId) {
-  // Called from a genre tag on either detail page — close whichever one is
-  // actually open rather than always assuming Movie Detail.
-  if (!showDetailEl.classList.contains('hidden')) closeShowDetail();
-  else closeMovieDetail();
-  document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === 'home'));
-  state.tab = 'home';
-  state.query = '';
-  searchEl.value = '';
-  genreFilterBtn.classList.remove('hidden');
-  renderHome().then(() => {
-    scrollShelfToTop(document.getElementById(`genre-shelf-${genreId}`));
-  });
 }
 
 // The checkmark button in the action bar is a straight toggle now (not a
@@ -2032,11 +2022,13 @@ async function openMovieDetail(item, { forceRefresh = false } = {}) {
 
   if (details.genres && details.genres.length) {
     for (const genre of details.genres) {
-      const tag = document.createElement('button');
-      tag.type = 'button';
+      // A plain <span>, not a button — these are informational tags, not
+      // a control, so they take no click and (being neither a button nor
+      // carrying a tabindex) are naturally invisible to the D-pad's
+      // spatial-nav SPATIAL_NAV_SELECTOR too.
+      const tag = document.createElement('span');
       tag.className = 'genre-tag';
       tag.textContent = genre.name;
-      tag.addEventListener('click', () => goToGenre(genre.id));
       movieDetailGenresEl.appendChild(tag);
     }
   }
