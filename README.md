@@ -1,9 +1,10 @@
-# VYZN (v0.2)
+# VYZN
 
 A self-hosted media server for Unraid: scans a folder for video files,
 indexes them in SQLite with TMDB metadata (movies and a full Show ->
 Season -> Episode hierarchy for TV), and serves them as HLS streams for
-playback in a browser or the future Google TV app.
+playback in a browser or the native Android TV app (`android-tv/`). See
+"Release history" below for exactly what shipped in which version of each.
 
 ## What's here
 
@@ -15,6 +16,7 @@ vyzn/
 │   ├── scanner.js      # Walks MEDIA_DIR, extracts metadata via ffprobe
 │   ├── tmdb.js         # TMDB title cleanup + lookup (movies, TV shows/seasons/episodes)
 │   ├── streamer.js     # On-demand ffmpeg -> HLS transcoding
+│   ├── seerr.js        # Jellyseerr/Overseerr client for "Add to Library"
 │   ├── ratings.js      # Shared movie/TV content-rating ordinal for profile gating
 │   └── concurrency.js  # Small concurrency-limited map helper
 ├── public/             # Browser GUI: poster grid, search, HLS player
@@ -22,6 +24,11 @@ vyzn/
 │   ├── app.js
 │   ├── style.css
 │   └── assets/         # VYZN logo + favicons
+├── android-tv/         # Native Android TV / Google TV app (own README.md)
+│   └── app/src/main/java/com/vyzn/tv/
+│       ├── MainActivity.kt         # WebView shell around the browser GUI
+│       ├── PlayerActivity.kt       # Native ExoPlayer screen (real 5.1 audio)
+│       └── NativePlayerBridge.kt   # JS <-> native playback handoff
 ├── Dockerfile
 ├── entrypoint.sh       # Remaps container user to Unraid's PUID/PGID
 ├── docker-compose.yml
@@ -31,14 +38,15 @@ vyzn/
 ## Browser GUI
 
 Open `http://<unraid-ip>:18080/` in a browser (Chrome/Firefox/Edge; Safari
-works too, using native HLS instead of hls.js) for a simple poster grid:
-click a movie to start a stream and play it inline, switch between the
-Movies/TV Shows tabs, search by title, and trigger a rescan from a button
-in the top bar. It's served by the same container — no separate deploy
-step. This is meant as a way to browse and test the library from a
-laptop/desktop before the Android TV client exists, not a polished
-long-term UI — TV shows currently list as flat individual episodes rather
-than grouped by series/season, since the database doesn't model that yet.
+works too, using native HLS instead of hls.js) for the full app: poster
+grid with Movies/TV Shows/genre shelves, a Show -> Season -> Episode
+hierarchy, search (local + Seerr), profiles, Settings, and the HLS player.
+It's served by the same container — no separate deploy step. This same
+frontend is also what the Android TV app shows inside its WebView (see
+`android-tv/README.md`), so there isn't a separate "TV UI" to keep in sync
+— the one exception is video playback, which the TV app hands off to a
+native ExoPlayer screen instead of the browser's HLS player, for real
+multichannel audio.
 
 ## API
 
@@ -212,6 +220,54 @@ its release notes. It's deliberately a manual check, not an automatic
 puller like Watchtower — installing an available update is still just
 `docker compose pull && docker compose up -d`, run by whoever administers
 that server, whenever they choose to.
+
+## Release history
+
+Two independently-versioned things live in this one repo: the **server**
+(tagged `vX.Y.Z`, published to GHCR as above) and the **Android TV app**
+(tagged `tv-vN`, distributed as a GitHub Release APK — see
+`android-tv/README.md`). They don't ship in lockstep, so check both lists
+for "am I up to date."
+
+**Server** (`package.json` version, [all tags](https://github.com/comsoll8/vyzn/tags)):
+
+- **v0.2.0** — first tagged release. Core server + browser GUI: library
+  scan, TMDB matching, HLS playback, TV Show -> Season -> Episode
+  hierarchy, profiles/parental ratings, Settings page, Tailscale remote
+  access. The Android TV app (still a plain WebView at this point) shipped
+  in the same commit.
+- **v0.2.1 / v0.2.2** — configurable TV-folder name instead of hardcoded
+  `TvShows`, trimmed whitespace in Settings fields, pulsing-logo loading
+  state in place of the old top progress bar, hero/first-shelf blend fix,
+  an Unraid Community Applications template, and the `media-server` ->
+  `vyzn` container rename.
+- **v0.3.0** — a TV-focused density/layout pass (smaller poster cards,
+  bigger hero, one shelf per screen, overscan safe-area padding, title/year
+  overlaid on the poster) plus several WebView-specific scroll/repaint
+  fixes for Android TV, and a Google Play privacy-policy page.
+- **v0.3.1** — D-pad vertical navigation aligns the whole shelf to the top
+  of the screen instead of nudging just the focused card into view.
+- **v0.3.2** (current) — fixed `scrollShelfToTop` ignoring the rows
+  container's own top padding.
+- **Unreleased on `main`** (not yet tagged/published to GHCR): Seerr URL
+  now auto-adds `http://` when the scheme is omitted, Home's shelves
+  (Because You Watched + Trending + every genre) shuffle together as one
+  combined order on every load instead of a fixed layout, and "Add to
+  Library" shrank from a full-width button to a small corner "+" badge
+  plus a long-press-anywhere-on-the-card gesture.
+
+**Android TV app** (`android-tv/`, [all releases](https://github.com/comsoll8/vyzn/releases)):
+
+- **tv-v1 (vyzn1.0)** — first real build: WebView shell (browsing, search,
+  settings — all the same web app the browser uses) plus a native
+  ExoPlayer playback screen (`GET /api/raw/:id`) so multichannel 5.1 audio
+  reaches the TV/AVR untouched instead of being downmixed like browser
+  playback. Release signing wired up for Play Console.
+- **tv-v2 (vyzn1.1)** — portrait support on phones/tablets (TV hardware
+  stays landscape-locked as before), a subtitle on/off toggle in the
+  native player, the native player's controls re-themed to match the web
+  player's minimalist look, and Continue Watching cards play directly
+  instead of detouring through a detail page.
 
 ## Genres
 
@@ -486,9 +542,9 @@ hero image to bleed upward in the first place, so `.app-nav` staying
 ## D-pad / remote-control navigation
 
 The frontend supports geometric spatial navigation with arrow keys, on top
-of mouse/touch — the same JS app is meant to work standalone in a browser,
-*and* be reused as-is inside a thin Android TV WebView wrapper down the
-line, rather than building a second native TV UI from scratch. Arrow keys
+of mouse/touch — the same JS app works standalone in a browser *and* is
+reused as-is inside the Android TV app's WebView (`android-tv/`), rather
+than building a second native TV UI from scratch. Arrow keys
 move focus to the nearest focusable thing in that direction (not DOM tab
 order), Enter/Space (a TV remote's "OK" button included) activates
 whatever's focused, and it's scoped to whichever overlay is currently on
@@ -518,7 +574,7 @@ embedded video on a page:
   windowed, and the manual ⛶ button is still there as a fallback. On the
   Android TV wrapper, this is exactly what feeds into the WebView's
   `onShowCustomView`/`onHideCustomView` fullscreen-video plumbing built
-  for it (see `vyzn-tv/`), so it now fires on every single video instead
+  for it (see `android-tv/`), so it now fires on every single video instead
   of only when someone happened to tap Fullscreen manually — which is also
   why that project's `MainActivity.kt` Back-button handling now checks for
   an active fullscreen custom view first (exiting it) before falling
@@ -1565,7 +1621,7 @@ entirely, so real multichannel audio reaches the TV/AVR intact. Added here:
   MKV might contain, and this is exactly the endpoint that's *not*
   browser-safe); only the TV app's native player uses it.
 - `public/app.js`'s `openPlayer()` now checks for `window.VyznNativePlayer`
-  (only ever defined inside the TV app's WebView — see vyzn-tv's
+  (only ever defined inside the TV app's WebView — see android-tv's
   `NativePlayerBridge.kt`) and, when present, hands playback off to it
   instead of setting up the browser's own HLS/hls.js player. Everything
   else about the page (browsing, detail pages, search, settings) is
@@ -1574,9 +1630,9 @@ entirely, so real multichannel audio reaches the TV/AVR intact. Added here:
 
 Full detail — what this fixes today (AAC 5.1, which was exactly what was
 failing), what it doesn't yet (AC-3/E-AC-3/DTS/TrueHD, which need
-ExoPlayer's separately-built FFmpeg extension), and what's deferred to a
-later pass (subtitles, in-player audio track switching, Up Next) — is in
-`vyzn-tv/README.md`'s "Native playback (ExoPlayer)" section.
+ExoPlayer's separately-built FFmpeg extension), and what's still deferred
+(in-player audio track switching, Up Next — subtitles shipped in tv-v2) —
+is in `android-tv/README.md`'s "Native playback (ExoPlayer)" section.
 
 ### Home screen: static hero banner + decluttered cards
 
@@ -1601,7 +1657,7 @@ Two changes to `public/style.css` and `public/app.js`:
   in the Continue Watching shelf, which plays directly on click and has no
   detail page of its own to reach Restart/Remove from otherwise.
 
-## Known limitations (intentional, for v0.2)
+## Known limitations (intentional)
 
 - No authentication — this is meant for LAN-only use for now. Do **not**
   port-forward 8080 to the internet as-is. The supported way to reach it
@@ -1620,13 +1676,15 @@ Two changes to `public/style.css` and `public/app.js`:
 - No transcode cleanup job yet — old HLS segments in `/transcode` will
   accumulate. Worth adding a cron/cleanup step before long-term use.
 
-## Next steps
+## Getting started, end to end
 
-1. Get this running and confirm you can scan + stream a file end to end,
-   with posters showing up in `/api/library`.
-2. Confirm `vainfo` inside the container sees the GPU and that a stream
-   actually uses it (check CPU usage during playback, or `intel_gpu_top`
-   on the host).
-3. Add TV show support to `tmdb.js` (season/episode parsing + `/search/tv`).
-4. Start the Google TV / Android client, pointed at `/api/library` and
-   `/api/stream/:id`.
+1. Get the server running and confirm you can scan + stream a file,
+   with posters showing up in `/api/library` ("Running locally" /
+   "Running on Unraid" above).
+2. If you enabled `HW_TRANSCODE`, confirm `vainfo` inside the container
+   sees the GPU and that a stream actually uses it (check CPU usage during
+   playback, or `intel_gpu_top` on the host).
+3. Browse and play from `http://<unraid-ip>:18080/` in any browser — no
+   extra setup needed, it's served by the same container.
+4. For a TV, install the Android TV app (`android-tv/README.md`) and point
+   it at that same address on first launch.

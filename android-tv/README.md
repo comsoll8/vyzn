@@ -13,18 +13,22 @@ project — so it also works if you ever open the same server in a browser
 with a keyboard. This project just makes sure the WebView's focus and Back
 button feed into that system correctly.
 
-## Important: this was built without an Android device or SDK
+## Status: built, side-loaded, and released (tv-v1, tv-v2)
 
-I don't have access to Android Studio, the Android SDK, a Kotlin compiler,
-or a physical/emulated device in this environment, so none of this code has
-actually been built or run. It's been written carefully and reviewed by
-hand, matching well-established, widely-documented patterns for each piece
-(WebView fullscreen video, `OnBackPressedCallback`, TV launcher manifest
-entries, etc.), but **you're the first real build and the first real test.**
-Please treat first launch as a debugging session, not just an install.
+Earlier revisions of this README said the app had never been built or run
+in this environment, since this environment has no Android SDK/emulator —
+that's still true of *this* environment, but no longer true of the app
+itself: it's since been built in a real Android Studio, side-loaded onto
+real TV hardware, and published as two GitHub Releases (`tv-v1`/vyzn1.0,
+`tv-v2`/vyzn1.1 — see the main `README.md`'s "Release history" for what
+shipped in each). Everything below ("built without an Android device")
+still applies to *new* code changes proposed from this environment going
+forward — anything just written here is reviewed carefully but genuinely
+untested until your next real build — it just no longer describes the app
+as a whole.
 
-The three things most likely to need a tweak after you see them on a real
-TV:
+The three things most likely to need a tweak on a change you haven't
+tested yet on a real TV:
 1. **D-pad → arrow key mapping.** Whether your remote's D-pad reliably
    generates `ArrowUp`/`ArrowDown`/`ArrowLeft`/`ArrowRight`/`Enter` key
    events inside the WebView. This is standard WebView behavior, but
@@ -47,7 +51,7 @@ description) and I can adjust the code.
 A standard Android Studio / Gradle project:
 
 ```
-vyzn-tv/
+android-tv/
   app/
     src/main/
       java/com/vyzn/tv/MainActivity.kt        <- WebView shell (browsing, detail pages, everything but video)
@@ -312,19 +316,20 @@ first pass specifically so the core problem (5.1 audio actually working)
 shipped without also trying to reach full feature parity with the browser
 player in the same change. Say the word for any of them.
 
-### Testing this, given the same "no device access" constraint as everything else
+### Status
 
-I have no Android SDK/NDK, no emulator, and no network access to Google's
-Maven repository in this environment (confirmed directly — a Gradle build
-here fails immediately trying to resolve the Android Gradle Plugin itself,
-before it even gets to compiling anything), so none of `PlayerActivity.kt`
-or `NativePlayerBridge.kt` has actually been compiled, let alone run. It's
-been written and manually reviewed against the Media3/ExoPlayer API
-carefully (method signatures, listener interfaces, XML attribute names),
-matching Google's own documented usage patterns, but — same as the rest of
-this project — **you're the first real build and the first real test.**
-If Gradle sync or compilation turns up anything (an API mismatch, a
-version conflict), send me the error and I'll fix it directly.
+Confirmed working on a real build as of `tv-v1`: `PlayerActivity.kt` and
+`NativePlayerBridge.kt` compile and play AAC 5.1 audio correctly. One real
+build break did surface along the way — `activity_player.xml`'s
+`fastforward_increment`/`rewind_increment` attributes don't exist on this
+version of `PlayerView` — fixed by moving that behavior to
+`ExoPlayer.Builder`'s `setSeekBackIncrementMs()`/`setSeekForwardIncrementMs()`
+in `PlayerActivity.kt` instead (see `tv-v2` / the main README's release
+notes). This environment still has no Android SDK/NDK/emulator/Maven
+access of its own, so any *new* change to these files is written and
+reviewed carefully but stays untested until your next real build — same as
+everything else in this project. If Gradle sync or compilation turns up
+anything, send me the error and I'll fix it directly.
 
 ## Icon / branding
 
