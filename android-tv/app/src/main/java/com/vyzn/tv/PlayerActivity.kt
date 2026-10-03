@@ -118,6 +118,12 @@ class PlayerActivity : AppCompatActivity() {
         // as the CC button (show_subtitle_button in activity_player.xml)
         // that toggles the subtitle track below.
         playerView.controllerShowTimeoutMs = 4000
+        // Without this, momentarily pausing (or any state change that
+        // resets the player) flashes a blank black frame behind the
+        // controls instead of leaving the last video frame showing —
+        // jarring compared to the web player, which never blanks the
+        // <video> element under its own controls overlay.
+        playerView.setKeepContentOnPlayerReset(true)
 
         val rawUrl = "$serverBaseUrl/api/raw/$itemId"
         val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(rawUrl))

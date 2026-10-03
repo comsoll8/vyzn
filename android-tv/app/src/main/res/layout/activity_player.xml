@@ -1,4 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Theming only — no custom controller_layout_id — so this stays within
+     PlayerView's own documented attributes (all stable/public since the
+     original ExoPlayer2 PlayerControlView) rather than depending on the
+     internal view IDs of whatever controller layout media3-ui ships
+     today, which would be far easier to get subtly wrong with no way to
+     test it from here.
+
+     - show_previous_button/show_next_button/show_shuffle_button=false:
+       there's only ever one MediaItem (a single title, no queue), so the
+       stock controller would otherwise show Previous/Next as permanently
+       disabled/no-op icons and an unused Shuffle button — dead chrome
+       that the web player's own minimalist control row doesn't have.
+     - fastforward/rewind_increment=15000: matches the web player's own
+       "Instant Replay" jump size (15s), rather than ExoPlayer's 10s
+       default.
+     - played/scrubber/unplayed/buffered_color: same monochrome white-
+       on-translucent-white scrubber as style.css's .player-seek, instead
+       of the stock controller's default accent-colored timebar. -->
 <androidx.media3.ui.PlayerView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/playerView"
@@ -8,4 +26,13 @@
     app:show_buffering="when_playing"
     app:resize_mode="fit"
     app:use_controller="true"
-    app:show_subtitle_button="true" />
+    app:show_subtitle_button="true"
+    app:show_previous_button="false"
+    app:show_next_button="false"
+    app:show_shuffle_button="false"
+    app:fastforward_increment="15000"
+    app:rewind_increment="15000"
+    app:played_color="#FFFFFFFF"
+    app:scrubber_color="#FFFFFFFF"
+    app:unplayed_color="#40FFFFFF"
+    app:buffered_color="#66FFFFFF" />
