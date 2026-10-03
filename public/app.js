@@ -38,16 +38,23 @@ if (appNavEl) {
   new ResizeObserver(syncNavHeight).observe(appNavEl);
 }
 
-// Rotates a list so the "first" entry changes once a day instead of being
-// permanently pinned (e.g. always the same highest-item-count genre
-// leading the Home page). Mirrors the same helper in server.js — used
-// here for the *order of genre shelves themselves*; item order within
-// each shelf is already rotated server-side.
-function rotateForToday(arr) {
-  if (!Array.isArray(arr) || arr.length < 2) return arr;
-  const dayIndex = Math.floor(Date.now() / 86400000);
-  const offset = dayIndex % arr.length;
-  return offset === 0 ? arr : arr.slice(offset).concat(arr.slice(0, offset));
+// Fisher-Yates, returning a new array — used for the *order of rows
+// themselves* on Home (which genre shelf leads, which "Because you
+// watched X" shelf leads), so Home doesn't always open on the same
+// highest-item-count genre or the same recommendation every time. A fresh
+// shuffle on every renderHome() call (not just once a day), unlike
+// server.js's own rotateForToday (still used there for item order *within*
+// a shelf, and for which shelves/trending rows appear at all) — that one's
+// deliberately stable across a whole day so a shelf's contents don't
+// visibly reshuffle under someone mid-browse; row order isn't something
+// anyone tracks the same way, so there's no reason to hold it stable.
+function shuffle(arr) {
+  const result = arr.slice();
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 }
 
 // --- DOM refs --------------------------------------------------------
@@ -987,7 +994,7 @@ async function renderHome() {
   // actually finished), but capping again here too so Home never grows a
   // 4th+ "Because you watched" row even if that server-side limit ever
   // changes — these are meant to stay a light garnish, not take over Home.
-  for (const shelf of recommendations.slice(0, 3)) {
+  for (const shelf of shuffle(recommendations.slice(0, 3))) {
     renderShelf(rowsEl, `Because you watched ${shelf.basedOn}`, shelf.items, recommendationCard);
   }
   // Trending now mixes movies and shows (server tags each row with
@@ -1001,14 +1008,15 @@ async function renderHome() {
   }
 }
 
-// One horizontal shelf per genre, highest-item-count genres first, mixing
-// movies and shows. Each shelf's items are already rating-filtered
-// server-side for the active profile, and renderShelf itself skips
-// building a section for a genre a profile's rating limit filtered down
-// to nothing — that's the "auto-hide" behavior.
+// One horizontal shelf per genre (highest-item-count genres picked first,
+// but then shuffled — see shuffle()'s comment — so it's not always the
+// same genre leading Home), mixing movies and shows. Each shelf's items
+// are already rating-filtered server-side for the active profile, and
+// renderShelf itself skips building a section for a genre a profile's
+// rating limit filtered down to nothing — that's the "auto-hide" behavior.
 async function renderGenreShelves(container, profileId) {
   if (!state.genres || state.genres.length === 0) return;
-  const top = rotateForToday(
+  const top = shuffle(
     state.genres
       .slice()
       .sort((a, b) => b.itemCount - a.itemCount)
