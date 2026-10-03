@@ -982,6 +982,14 @@ gives you **two different values** there, and mixing them up causes a
 Set exactly one of these two env vars (not both) to match whichever
 credential you copied. Sanity-check it before wiring it into Docker:
 
+**Attribution:** TMDB's API Terms of Use require a visible notice that the
+product uses the TMDB API and isn't endorsed/certified by them, referring
+to them only as "TMDB" or "The Movie Database", in an About/Credits
+section ([details](https://www.themoviedb.org/about/logos-attribution)).
+That notice is in the app's own Settings > About section (`public/index.html`),
+which covers the Android TV app too since it shows this same page in its
+WebView — nothing extra to add there.
+
 ## Scan performance (large libraries)
 
 Scanning runs in two parallel phases instead of one slow serial pass:
