@@ -1665,6 +1665,21 @@ Two changes to `public/style.css` and `public/app.js`:
   in the Continue Watching shelf, which plays directly on click and has no
   detail page of its own to reach Restart/Remove from otherwise.
 
+## Credits
+
+- **[TMDB](https://www.themoviedb.org)** — all movie/TV metadata, posters,
+  backdrops, and trailers. "This product uses the TMDB API but is not
+  endorsed or certified by TMDB." (see "TMDB metadata" above). Also shown
+  in-app at Settings > About.
+- **[Abyss](https://github.com/AumGupta/abyss-jellyfin)** — a Jellyfin
+  theme by Om Gupta, used under its MIT license, is the direct visual
+  inspiration for VYZN's whole dark/minimal design language (palette,
+  typography, motion, pill tabs, metadata chips — see "Theme:
+  Abyss-inspired look" below for the full breakdown). Its own CSS/DOM
+  targets Jellyfin specifically and isn't reused here — what's ported is
+  the design language itself, rebuilt against VYZN's own markup and CSS
+  variables. Also shown in-app at Settings > About.
+
 ## Known limitations (intentional)
 
 - No authentication — this is meant for LAN-only use for now. Do **not**
