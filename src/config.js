@@ -52,6 +52,14 @@ const SCHEMA = {
     envVar: 'VAAPI_DEVICE', secret: false,
     label: 'VAAPI Device', hint: 'e.g. /dev/dri/renderD128',
   },
+  TRANSCODE_MAX_AGE_HOURS: {
+    envVar: 'TRANSCODE_MAX_AGE_HOURS', secret: false,
+    label: 'Transcode Cache: Max Age (hours)', hint: 'Delete idle transcoded streams after this long. Default 24, 0 = never',
+  },
+  TRANSCODE_MAX_GB: {
+    envVar: 'TRANSCODE_MAX_GB', secret: false,
+    label: 'Transcode Cache: Max Size (GB)', hint: 'Also delete least-recently-used streams to stay under this. 0 = no cap (default)',
+  },
   TAILSCALE_AUTHKEY: {
     envVar: 'TAILSCALE_AUTHKEY', secret: true,
     label: 'Tailscale Auth Key', hint: 'One-off or reusable key from the Tailscale admin console',

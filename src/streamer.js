@@ -72,6 +72,7 @@ function startHlsJob(itemId, sourcePath, { audioTrackIndex, title } = {}) {
 
   const outDir = outputDirFor(itemId, audioTrackKey);
   fs.mkdirSync(outDir, { recursive: true });
+  touchItemDir(itemId); // counts as "recently used" for the cleanup sweep below
   const playlistPath = playlistPathFor(itemId, audioTrackKey);
 
   let commandRef = null;
@@ -244,7 +245,151 @@ function extractSubtitlesIfNeeded(itemId, sourcePath, subtitleTracks) {
   });
 }
 
+// --- Transcode cache cleanup --------------------------------------------
+// Nothing else ever deletes HLS output, and a fully-transcoded movie is
+// several GB — left alone, /transcode grows without bound (one real
+// install hit 109GB). Each item gets its own dir (see itemDirFor), so the
+// sweep works a whole item at a time: an item is only removed if it has no
+// running ffmpeg job and nothing under it has been written/touched within
+// the age window. It's purely a cache — the next play just re-transcodes.
+const DEFAULT_MAX_AGE_HOURS = 24;
+const SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+
+function readNumberSetting(key, fallback) {
+  const raw = config.get(key);
+  if (raw === null || raw === undefined || String(raw).trim() === '') return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+function touchItemDir(itemId) {
+  try {
+    const now = new Date();
+    fs.utimesSync(itemDirFor(itemId), now, now);
+  } catch {
+    // Best-effort — worst case the dir looks older than it is.
+  }
+}
+
+function isItemActive(itemId) {
+  const prefix = `${itemId}:`;
+  for (const key of activeJobs.keys()) {
+    if (key.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
+// Total bytes + newest mtime (files and dirs) under a path. Async so a
+// huge first-run backlog doesn't stall the event loop (and so streaming).
+async function measureDir(dir) {
+  let bytes = 0;
+  let newestMs = 0;
+  async function walk(d) {
+    const st = await fs.promises.stat(d);
+    if (st.mtimeMs > newestMs) newestMs = st.mtimeMs;
+    const entries = await fs.promises.readdir(d, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(d, entry.name);
+      if (entry.isDirectory()) {
+        await walk(full);
+      } else {
+        try {
+          const fst = await fs.promises.stat(full);
+          bytes += fst.size;
+          if (fst.mtimeMs > newestMs) newestMs = fst.mtimeMs;
+        } catch {
+          // File vanished mid-walk (a running job rotating output) — skip.
+        }
+      }
+    }
+  }
+  await walk(dir);
+  return { bytes, newestMs };
+}
+
+/**
+ * One cleanup pass. Settings (Control Center > Settings, or env vars):
+ *   TRANSCODE_MAX_AGE_HOURS — delete idle items untouched this long
+ *     (default 24; 0 disables the age rule)
+ *   TRANSCODE_MAX_GB — if the cache is still bigger than this after the
+ *     age rule, delete least-recently-used idle items until it fits
+ *     (default 0 = no size cap)
+ */
+async function sweepTranscodeDir() {
+  const maxAgeHours = readNumberSetting('TRANSCODE_MAX_AGE_HOURS', DEFAULT_MAX_AGE_HOURS);
+  const maxBytes = readNumberSetting('TRANSCODE_MAX_GB', 0) * 1024 ** 3;
+  if (maxAgeHours === 0 && maxBytes === 0) return { removed: 0, freedBytes: 0 };
+
+  let entries;
+  try {
+    entries = await fs.promises.readdir(TRANSCODE_DIR, { withFileTypes: true });
+  } catch {
+    return { removed: 0, freedBytes: 0 }; // dir doesn't exist yet — nothing to clean
+  }
+
+  const items = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const dir = path.join(TRANSCODE_DIR, entry.name);
+    try {
+      const { bytes, newestMs } = await measureDir(dir);
+      items.push({ id: entry.name, dir, bytes, newestMs, active: isItemActive(entry.name) });
+    } catch (err) {
+      console.warn(`[cleanup] Couldn't inspect ${dir}:`, err.message);
+    }
+  }
+
+  const now = Date.now();
+  let removed = 0;
+  let freedBytes = 0;
+  async function remove(item, reason) {
+    try {
+      await fs.promises.rm(item.dir, { recursive: true, force: true });
+      removed += 1;
+      freedBytes += item.bytes;
+      item.removed = true;
+      console.log(`[cleanup] Removed transcode cache for item ${item.id} (${reason}, ${(item.bytes / 1024 ** 3).toFixed(2)} GB)`);
+    } catch (err) {
+      console.warn(`[cleanup] Failed to remove ${item.dir}:`, err.message);
+    }
+  }
+
+  if (maxAgeHours > 0) {
+    for (const item of items) {
+      if (!item.active && now - item.newestMs > maxAgeHours * 3600 * 1000) {
+        await remove(item, `idle > ${maxAgeHours}h`);
+      }
+    }
+  }
+
+  if (maxBytes > 0) {
+    let total = items.filter((i) => !i.removed).reduce((sum, i) => sum + i.bytes, 0);
+    const lru = items.filter((i) => !i.removed && !i.active).sort((a, b) => a.newestMs - b.newestMs);
+    for (const item of lru) {
+      if (total <= maxBytes) break;
+      await remove(item, `over ${maxBytes / 1024 ** 3} GB cap`);
+      total -= item.bytes;
+    }
+  }
+
+  if (removed > 0) {
+    console.log(`[cleanup] Freed ${(freedBytes / 1024 ** 3).toFixed(2)} GB across ${removed} item(s)`);
+  }
+  return { removed, freedBytes };
+}
+
+let sweepTimer = null;
+function startTranscodeCleanup() {
+  if (sweepTimer) return;
+  const run = () => sweepTranscodeDir().catch((err) => console.error('[cleanup] Sweep failed:', err));
+  setTimeout(run, 15 * 1000).unref(); // shortly after boot, once the server is up
+  sweepTimer = setInterval(run, SWEEP_INTERVAL_MS);
+  sweepTimer.unref();
+}
+
 module.exports = {
+  startTranscodeCleanup,
+  sweepTranscodeDir,
   startHlsJob,
   outputDirFor,
   playlistPathFor,

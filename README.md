@@ -247,14 +247,13 @@ for "am I up to date."
   fixes for Android TV, and a Google Play privacy-policy page.
 - **v0.3.1** — D-pad vertical navigation aligns the whole shelf to the top
   of the screen instead of nudging just the focused card into view.
-- **v0.3.2** (current) — fixed `scrollShelfToTop` ignoring the rows
+- **v0.3.2** — fixed `scrollShelfToTop` ignoring the rows
   container's own top padding.
-- **Unreleased on `main`** (not yet tagged/published to GHCR): Seerr URL
-  now auto-adds `http://` when the scheme is omitted, Home's shelves
-  (Because You Watched + Trending + every genre) shuffle together as one
-  combined order on every load instead of a fixed layout, and "Add to
-  Library" shrank from a full-width button to a small corner "+" badge
-  plus a long-press-anywhere-on-the-card gesture.
+- **v0.3.3** — Seerr URL scheme fix, Home shelves shuffle together, Add to
+  Library corner "+" button with long-press, removed the redundant "Not in
+  library" badge, TMDB and Abyss attribution.
+- **v0.3.4** (current) — automatic transcode cache cleanup (the
+  `/transcode` folder previously grew forever).
 
 **Android TV app** (`android-tv/`, [all releases](https://github.com/comsoll8/vyzn/releases)):
 
@@ -268,6 +267,8 @@ for "am I up to date."
   native player, the native player's controls re-themed to match the web
   player's minimalist look, and Continue Watching cards play directly
   instead of detouring through a detail page.
+- **Unreleased on `main`** (will be `tv-v3`): native "Up Next" card that
+  auto-advances to the next TV episode (see `android-tv/README.md`).
 
 ## Genres
 
@@ -1681,6 +1682,27 @@ Two changes to `public/style.css` and `public/app.js`:
   the design language itself, rebuilt against VYZN's own markup and CSS
   variables. Also shown in-app at Settings > About.
 
+## Transcode cache cleanup
+
+Every title you play leaves its HLS segments in `/transcode/<itemId>/`, and
+a fully transcoded movie is several GB. Until 0.3.4 nothing ever deleted
+them — one real install reached **109GB** (found via
+`du -sh /mnt/user/appdata/vyzn/* | sort -h`). A sweep now runs 15 seconds
+after startup and hourly after, removing a title's whole cache folder when
+it has **no running ffmpeg job** and nothing in it was written or touched
+within the age window. Two settings, editable in Settings > Connections
+(or as env vars of the same name), take effect on the next sweep:
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `TRANSCODE_MAX_AGE_HOURS` | `24` | Delete idle titles untouched this long. `0` turns the age rule off. |
+| `TRANSCODE_MAX_GB` | `0` (no cap) | If the cache is still bigger than this after the age rule, delete least-recently-used idle titles until it fits. |
+
+It's purely a cache: deleting an item's folder just means that title
+transcodes again next time it's played. Active streams are never touched.
+The first sweep after upgrading clears any existing backlog, so the
+`rm -rf` by hand is optional.
+
 ## Known limitations (intentional)
 
 - No authentication — this is meant for LAN-only use for now. Do **not**
@@ -1697,8 +1719,9 @@ Two changes to `public/style.css` and `public/app.js`:
   not built for many concurrent transcodes. With HW_TRANSCODE on, encode
   is offloaded but decode is still CPU, so very old CPUs may still
   struggle with multiple simultaneous streams.
-- No transcode cleanup job yet — old HLS segments in `/transcode` will
-  accumulate. Worth adding a cron/cleanup step before long-term use.
+- Transcode cache cleanup is automatic (see "Transcode cache cleanup"
+  below) — but it's a cache, so a title not played in the last day re-transcodes
+  from scratch on its next play.
 
 ## Getting started, end to end
 

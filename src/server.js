@@ -49,7 +49,7 @@ const fastify = require('fastify')({
 
 const db = require('./db');
 const { runScan, enrichUnmatched, backfillGenres, scanEvents, linkMediaGenres } = require('./scanner');
-const { startHlsJob, listActiveJobs, stopJob, extractSubtitlesIfNeeded } = require('./streamer');
+const { startHlsJob, listActiveJobs, stopJob, extractSubtitlesIfNeeded, startTranscodeCleanup } = require('./streamer');
 const tmdb = require('./tmdb');
 const ratings = require('./ratings');
 const seerr = require('./seerr');
@@ -1670,6 +1670,7 @@ async function main() {
 
   await fastify.listen({ port: PORT, host: '0.0.0.0' });
   fastify.log.info(`Media server listening on port ${PORT}, serving ${MEDIA_DIR}`);
+  startTranscodeCleanup();
 }
 
 main().catch((err) => {
