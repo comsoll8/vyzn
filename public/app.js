@@ -423,6 +423,9 @@ const SPATIAL_NAV_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function getSpatialNavRoot() {
+  const adminEl = document.getElementById('adminOverlay');
+  if (adminEl && !adminEl.classList.contains('hidden')) return adminEl;
+  if (!avatarPickerEl.classList.contains('hidden')) return avatarPickerEl;
   const loginEl = document.getElementById('loginOverlay');
   if (loginEl && !loginEl.classList.contains('hidden')) return loginEl;
   if (!appSwitcherOverlayEl.classList.contains('hidden')) return appSwitcherOverlayEl;
@@ -632,21 +635,63 @@ async function fetchProfiles() {
   return res.json();
 }
 
-async function createProfile(name, isChild) {
+async function createProfile(name, isChild, avatar) {
   const res = await fetch('/api/profiles', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, is_child: isChild, max_content_rating: isChild ? 'PG' : null }),
+    body: JSON.stringify({ name, avatar, is_child: isChild, max_content_rating: isChild ? 'PG' : null }),
   });
   return res.json();
 }
+
+// --- Profile pictures -------------------------------------------------------
+// avatar is either an id from the built-in set (public/assets/avatars/<id>.svg)
+// or, for profiles made before pictures existed, a single letter.
+const AVATAR_IDS = ['vyzn','astro','robot','ghost','alien','cat','fox','bear','owl','popcorn','clap','phones','planet','bolt','moon','rocket','shades','crown','glasses3d','pad','eye','wave','gem','flame','ninja'];
+function avatarInner(p) {
+  if (p.avatar && /^[a-z0-9-]{2,32}$/.test(p.avatar)) {
+    return `<img src="/assets/avatars/${p.avatar}.svg" alt="" class="avatar-img" draggable="false" />`;
+  }
+  return (p.avatar || p.name || '?').slice(0, 1).toUpperCase();
+}
+function hasAvatarImg(p) { return !!(p.avatar && /^[a-z0-9-]{2,32}$/.test(p.avatar)); }
+
+let avatarPickCb = null;
+const avatarPickerEl = document.getElementById('avatarPicker');
+const avatarGridEl = document.getElementById('avatarGrid');
+function openAvatarPicker(current, cb) {
+  avatarPickCb = cb;
+  avatarGridEl.innerHTML = '';
+  for (const id of AVATAR_IDS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'avatar-choice' + (id === current ? ' selected' : '');
+    b.innerHTML = `<img src="/assets/avatars/${id}.svg" alt="${id}" draggable="false" />`;
+    b.addEventListener('click', () => { const f = avatarPickCb; closeAvatarPicker(); if (f) f(id); });
+    avatarGridEl.appendChild(b);
+  }
+  avatarPickerEl.classList.remove('hidden');
+  const sel = avatarGridEl.querySelector('.selected') || avatarGridEl.firstChild;
+  if (sel) sel.focus();
+}
+function closeAvatarPicker() { avatarPickerEl.classList.add('hidden'); avatarPickCb = null; }
+document.getElementById('avatarPickerCancel').addEventListener('click', closeAvatarPicker);
+avatarPickerEl.addEventListener('click', (e) => { if (e.target === avatarPickerEl) closeAvatarPicker(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !avatarPickerEl.classList.contains('hidden')) { e.stopPropagation(); closeAvatarPicker(); } }, true);
+
+// New-profile form: pick a picture (random default so every new profile looks distinct).
+let newProfileAvatar = AVATAR_IDS[Math.floor(Math.random() * AVATAR_IDS.length)];
+const newProfileAvatarBtn = document.getElementById('newProfileAvatarBtn');
+function paintNewAvatar() { newProfileAvatarBtn.innerHTML = `<img src="/assets/avatars/${newProfileAvatar}.svg" alt="" draggable="false" />`; }
+paintNewAvatar();
+newProfileAvatarBtn.addEventListener('click', () => openAvatarPicker(newProfileAvatar, (id) => { newProfileAvatar = id; paintNewAvatar(); }));
 
 function renderProfileList(profiles) {
   profileListEl.innerHTML = '';
   for (const p of profiles) {
     const card = document.createElement('button');
     card.className = 'profile-card';
-    card.innerHTML = `<div class="profile-avatar">${(p.avatar || p.name || '?').slice(0, 1).toUpperCase()}</div><span>${p.name}${p.is_child ? ' 🧒' : ''}</span>`;
+    card.innerHTML = `<div class="profile-avatar${hasAvatarImg(p) ? ' has-img' : ''}">${avatarInner(p)}</div><span>${p.name}${p.is_child ? ' 🧒' : ''}</span>`;
     card.addEventListener('click', () => selectProfile(p));
     profileListEl.appendChild(card);
   }
@@ -683,7 +728,7 @@ newProfileForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const name = newProfileNameEl.value.trim();
   if (!name) return;
-  const profile = await createProfile(name, newProfileChildEl.checked);
+  const profile = await createProfile(name, newProfileChildEl.checked, newProfileAvatar);
   newProfileNameEl.value = '';
   newProfileChildEl.checked = false;
   const profiles = await fetchProfiles();
@@ -692,6 +737,17 @@ newProfileForm.addEventListener('submit', async (e) => {
 });
 
 controlCenterBtn.addEventListener('click', () => openControlCenter());
+
+document.getElementById('ccChangeAvatarBtn').addEventListener('click', () => {
+  const p = state.profile;
+  if (!p) return;
+  openAvatarPicker(p.avatar, async (id) => {
+    const res = await fetch('/api/profiles/' + p.id, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ avatar: id }),
+    });
+    if (res.ok) { state.profile = await res.json(); await renderCcProfiles(); }
+  });
+});
 
 ccSwitchToGateBtn.addEventListener('click', () => {
   closeControlCenter();
@@ -2978,7 +3034,7 @@ function ccProfileRow(profile) {
   const row = document.createElement('button');
   row.type = 'button';
   row.className = 'cc-profile-row' + (state.profile && state.profile.id === profile.id ? ' active' : '');
-  row.innerHTML = `<span class="cc-profile-avatar">${(profile.avatar || profile.name || '?').slice(0, 1).toUpperCase()}</span><span>${profile.name}${profile.is_child ? ' 🧒' : ''}</span>`;
+  row.innerHTML = `<span class="cc-profile-avatar${hasAvatarImg(profile) ? ' has-img' : ''}">${avatarInner(profile)}</span><span>${profile.name}${profile.is_child ? ' 🧒' : ''}</span>`;
   row.addEventListener('click', () => switchProfileInstant(profile));
   return row;
 }

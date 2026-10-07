@@ -17,6 +17,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const db = require('./db');
+const activity = require('./activity');
 
 const COOKIE = 'vyzn_auth';
 const DAY = 24 * 60 * 60 * 1000;
@@ -353,7 +354,7 @@ function register(fastify) {
     if (!requireAdmin(req, reply)) return;
     const users = db.prepare('SELECT id, username, display_name, is_admin, created_at FROM users ORDER BY id').all();
     const profiles = db.prepare(`
-      SELECT p.id, p.name, p.user_id, p.is_child,
+      SELECT p.id, p.name, p.avatar, p.user_id, p.is_child,
              (SELECT COUNT(*) FROM playback_progress WHERE profile_id = p.id) AS titles_watched,
              (SELECT MAX(last_watched_at) FROM playback_progress WHERE profile_id = p.id) AS last_watched_at
       FROM profiles p ORDER BY p.id`).all();
@@ -365,39 +366,7 @@ function register(fastify) {
     });
   });
 
-  // One row per (profile, title): the latest position/time. VYZN stores the
-  // last state per title, not a full play-by-play log.
-  fastify.get('/api/admin/history', async (req, reply) => {
-    if (!requireAdmin(req, reply)) return;
-    const q = req.query || {};
-    const limit = Math.min(Math.max(parseInt(q.limit, 10) || 50, 1), 200);
-    const offset = Math.max(parseInt(q.offset, 10) || 0, 0);
-    const where = []; const args = {};
-    if (/^\d+$/.test(q.user || '')) { where.push('p.user_id = @user'); args.user = Number(q.user); }
-    if (/^\d+$/.test(q.profile || '')) { where.push('pp.profile_id = @profile'); args.profile = Number(q.profile); }
-    const rows = db.prepare(`
-      SELECT pp.profile_id, p.name AS profile_name, u.id AS user_id, u.username, COALESCE(u.display_name, u.username) AS user_display,
-             m.id AS media_id, m.title AS media_title, m.poster_url,
-             s.title AS show_title, se.season_number, e.episode_number, e.title AS episode_title,
-             pp.position_seconds, pp.duration_seconds, pp.completed, pp.last_watched_at
-      FROM playback_progress pp
-      JOIN profiles p ON p.id = pp.profile_id
-      LEFT JOIN users u ON u.id = p.user_id
-      JOIN media_items m ON m.id = pp.media_id
-      LEFT JOIN tv_episodes e ON e.media_item_id = m.id
-      LEFT JOIN tv_seasons se ON se.id = e.season_id
-      LEFT JOIN tv_shows s ON s.id = e.show_id
-      ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-      ORDER BY pp.last_watched_at DESC LIMIT @limit OFFSET @offset`).all({ ...args, limit, offset });
-    return rows.map((r) => ({
-      user: r.user_display, username: r.username, profile: r.profile_name, profileId: r.profile_id,
-      title: r.show_title
-        ? `${r.show_title} · S${String(r.season_number).padStart(2, '0')}E${String(r.episode_number).padStart(2, '0')}${r.episode_title ? ' · ' + r.episode_title : ''}`
-        : r.media_title,
-      percent: r.duration_seconds > 0 ? Math.min(100, Math.round((r.position_seconds / r.duration_seconds) * 100)) : 0,
-      completed: !!r.completed, lastWatchedAt: r.last_watched_at,
-    }));
-  });
+  activity.register(fastify, requireAdmin);
 
   // Reset an account: new password + sign out every device.
   fastify.post('/api/admin/users/:id/reset', async (req, reply) => {

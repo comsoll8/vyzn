@@ -56,6 +56,7 @@ const seerr = require('./seerr');
 const config = require('./config');
 const tailscale = require('./tailscale');
 const auth = require('./auth');
+const activity = require('./activity');
 
 // Plain X.Y.Z numeric comparison for the "Check for Updates" route —
 // returns >0 if `a` is newer than `b`. Not full semver (no pre-release/
@@ -380,6 +381,11 @@ function clearPoisonedDetailCache() {
   if (result.changes > 0) {
     fastify.log.info(`Cleared ${result.changes} empty tmdb_detail_cache row(s) so they'll be retried against TMDB`);
   }
+}
+
+// Profile avatars are ids of the built-in set in public/assets/avatars/.
+function cleanAvatar(v) {
+  return typeof v === 'string' && /^[a-z0-9-]{1,32}$/.test(v) ? v : null;
 }
 
 async function main() {
@@ -846,7 +852,7 @@ async function main() {
     }
     const result = db
       .prepare('INSERT INTO profiles (name, avatar, is_child, max_content_rating, user_id) VALUES (?, ?, ?, ?, ?)')
-      .run(name, avatar || null, isChild ? 1 : 0, maxRating || null, request.user ? request.user.id : null);
+      .run(name, cleanAvatar(avatar), isChild ? 1 : 0, maxRating || null, request.user ? request.user.id : null);
     return db.prepare('SELECT * FROM profiles WHERE id = ?').get(result.lastInsertRowid);
   });
 
@@ -859,7 +865,7 @@ async function main() {
     const body = request.body || {};
     const merged = {
       name: body.name !== undefined ? body.name : profile.name,
-      avatar: body.avatar !== undefined ? body.avatar : profile.avatar,
+      avatar: body.avatar !== undefined ? cleanAvatar(body.avatar) : profile.avatar,
       is_child: body.is_child !== undefined ? (body.is_child ? 1 : 0) : profile.is_child,
       max_content_rating: body.max_content_rating !== undefined ? body.max_content_rating : profile.max_content_rating,
     };
@@ -902,6 +908,10 @@ async function main() {
         last_watched_at = datetime('now')
     `).run({ profileId, mediaId, position, duration, completed });
 
+    activity.recordPlay({
+      profileId, mediaId, position, duration, completed,
+      user: request.user, ua: request.headers['user-agent'], ip: request.ip,
+    });
     return { ok: true, completed: Boolean(completed) };
   });
 

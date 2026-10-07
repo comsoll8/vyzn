@@ -64,6 +64,31 @@
     </div>
   </div>
 
+  <!-- Profile picture picker (built-in VYZN avatars, public/assets/avatars/) -->
+  <div id="avatarPicker" class="avatar-picker hidden" role="dialog" aria-label="Choose a profile picture">
+    <div class="avatar-picker-card">
+      <h2>Choose a picture</h2>
+      <div id="avatarGrid" class="avatar-grid"></div>
+      <button type="button" id="avatarPickerCancel" class="btn-secondary">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Admin dashboard (Tautulli-style): live activity, play log, stats, users. admin.js -->
+  <div id="adminOverlay" class="admin-overlay hidden" role="dialog" aria-label="Admin dashboard">
+    <header class="admin-top">
+      <img src="/assets/vyzn-mark.svg" alt="" class="admin-top-mark" />
+      <h2>Dashboard</h2>
+      <nav class="admin-tabs" id="adminTabs">
+        <button type="button" data-tab="activity" class="active">Activity</button>
+        <button type="button" data-tab="history">History</button>
+        <button type="button" data-tab="stats">Stats</button>
+        <button type="button" data-tab="users">Users</button>
+      </nav>
+      <button type="button" id="adminClose" class="close-btn" aria-label="Close">&times;</button>
+    </header>
+    <main id="adminBody" class="admin-body"></main>
+  </div>
+
   <div id="vyznToast" class="vyzn-toast" role="status" aria-live="polite"></div>
 
   <!-- Profile picker: shown until a profile is chosen (stored in localStorage) -->
@@ -72,6 +97,7 @@
     <h1>Who's watching?</h1>
     <div id="profileList" class="profile-list"></div>
     <form id="newProfileForm" class="new-profile-form">
+      <button type="button" id="newProfileAvatarBtn" class="new-profile-avatar-btn" title="Choose a picture" aria-label="Choose a profile picture"></button>
       <input id="newProfileName" type="text" placeholder="New profile name" autocomplete="off" required />
       <label class="child-check"><input id="newProfileChild" type="checkbox" /> Kids profile</label>
       <button type="submit">Add profile</button>
@@ -340,18 +366,6 @@
         </form>
       </section>
 
-      <section class="settings-section hidden" id="adminSection">
-        <h3>Admin: accounts &amp; watch history</h3>
-        <p class="settings-hint">Reset passwords, clear a profile's history, and see what everyone has watched (latest state per title).</p>
-        <div id="adminUsers" class="admin-users"></div>
-        <div class="admin-history-head">
-          <select id="adminHistFilter"><option value="">All accounts &amp; profiles</option></select>
-          <button type="button" id="adminHistRefresh" class="btn-secondary">Refresh</button>
-        </div>
-        <div id="adminHistory" class="admin-history"></div>
-        <button type="button" id="adminHistMore" class="btn-secondary hidden">Load more</button>
-      </section>
-
       <!-- Required by TMDB's API Terms of Use: a visible attribution notice
            in an About/Credits section, linking to themoviedb.org, referring
            to them only as "TMDB" or "The Movie Database". See
@@ -395,6 +409,8 @@
       <h3>Switch Profile</h3>
       <div id="ccProfileList" class="cc-profile-list"></div>
       <button id="ccSwitchToGateBtn" class="btn-secondary cc-full-btn">All Profiles</button>
+      <button id="ccAdminBtn" class="btn-secondary cc-full-btn hidden">Admin Dashboard</button>
+      <button id="ccChangeAvatarBtn" class="btn-secondary cc-full-btn">Change Profile Picture</button>
       <button id="ccSignOutBtn" class="btn-secondary cc-full-btn hidden">Sign Out</button>
     </section>
 
@@ -613,6 +629,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
   <script src="/auth.js"></script>
+  <script src="/admin.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

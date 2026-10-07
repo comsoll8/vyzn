@@ -229,6 +229,32 @@ const detailCacheColumns = new Set(db.prepare(`PRAGMA table_info(tmdb_detail_cac
 if (!detailCacheColumns.has('similar_source')) {
   db.exec(`ALTER TABLE tmdb_detail_cache ADD COLUMN similar_source TEXT`);
 }
+// Play log (Tautulli-style): one row per viewing session, written by
+// src/activity.js from the player's progress pings. Name/title snapshots
+// are stored so history survives deleting a profile, account or file.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS play_log (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id       INTEGER,
+    profile_name     TEXT,
+    user_id          INTEGER,
+    user_name        TEXT,
+    media_id         INTEGER,
+    title            TEXT,
+    group_title      TEXT,
+    started_at       INTEGER NOT NULL,
+    last_seen_at     INTEGER NOT NULL,
+    position_seconds REAL DEFAULT 0,
+    duration_seconds REAL DEFAULT 0,
+    watched_seconds  REAL DEFAULT 0,
+    completed        INTEGER DEFAULT 0,
+    platform         TEXT,
+    ip               TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_play_log_started ON play_log(started_at);
+  CREATE INDEX IF NOT EXISTS idx_play_log_profile ON play_log(profile_id, media_id, last_seen_at);
+`);
+
 // Profiles belong to an account (src/auth.js): each login sees only its own
 // "Who's watching?" list. NULL = created before accounts existed; the first
 // account created claims all of those.
