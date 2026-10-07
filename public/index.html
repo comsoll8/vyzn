@@ -261,6 +261,25 @@
       </section>
 
       <section class="settings-section" data-admin-only>
+        <h3>Automatic scanning</h3>
+        <form id="autoScanForm" class="autoscan-form">
+          <label class="config-field"><span class="config-field-label">Scan</span>
+            <select id="autoScanMode">
+              <option value="off">Off (manual only)</option>
+              <option value="daily">Once a day</option>
+              <option value="watch">When files change</option>
+            </select>
+          </label>
+          <label class="config-field" id="autoScanTimeWrap"><span class="config-field-label">Time of day</span>
+            <input id="autoScanTime" type="time" value="03:00" />
+          </label>
+          <button type="submit" class="btn-secondary">Save</button>
+        </form>
+        <p id="autoScanStatus" class="settings-hint"></p>
+        <p class="settings-hint">"When files change" watches your Movies/TV folders and scans a couple of minutes after the last new file appears, so downloads finish first. It doesn't spin up idle disks, but some network shares don't report changes — use "Once a day" there. Removed files aren't detected yet.</p>
+      </section>
+
+      <section class="settings-section" data-admin-only>
         <h3>Unmatched items</h3>
         <p class="settings-hint">Items with no TMDB match yet. Moved to its own page since the list can get long.</p>
         <button id="openUnmatchedBtn" class="btn-secondary">

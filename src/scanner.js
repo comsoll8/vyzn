@@ -613,7 +613,28 @@ async function backfillGenres({ emitComplete = true } = {}) {
   return { candidates: total, updated };
 }
 
-async function runScan() {
+// Only one scan at a time: a manual click, the scheduler and the file
+// watcher can all ask for one, and overlapping scans would fight over the
+// same rows. A second caller just joins the one already in progress.
+let scanInFlight = null;
+function runScan() {
+  if (scanInFlight) return scanInFlight;
+  scanInFlight = runScanInner().finally(() => { scanInFlight = null; });
+  return scanInFlight;
+}
+const isScanRunning = () => scanInFlight !== null;
+
+// Folders worth watching for new files — mirrors what walk() will scan.
+function scanRoots() {
+  if (ONLY_TOP_LEVEL_DIRS.length === 0) return [MEDIA_DIR];
+  let names = [];
+  try { names = fs.readdirSync(MEDIA_DIR, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name); } catch { return []; }
+  return names
+    .filter((n) => ONLY_TOP_LEVEL_DIRS.some((a) => a.toLowerCase() === n.toLowerCase()))
+    .map((n) => path.join(MEDIA_DIR, n));
+}
+
+async function runScanInner() {
   const scopeDesc = ONLY_TOP_LEVEL_DIRS.length > 0
     ? `${MEDIA_DIR} (only: ${ONLY_TOP_LEVEL_DIRS.join(', ')})`
     : MEDIA_DIR;
@@ -704,6 +725,10 @@ if (require.main === module) {
 
 module.exports = {
   runScan,
+  isScanRunning,
+  scanRoots,
+  shouldSkipDir,
+  VIDEO_EXTENSIONS,
   enrichUnmatched,
   backfillGenres,
   parseTvFilename,

@@ -57,6 +57,7 @@ const config = require('./config');
 const tailscale = require('./tailscale');
 const auth = require('./auth');
 const activity = require('./activity');
+const autoscan = require('./autoscan');
 
 // Plain X.Y.Z numeric comparison for the "Check for Updates" route —
 // returns >0 if `a` is newer than `b`. Not full semver (no pre-release/
@@ -510,6 +511,7 @@ async function main() {
       if (config.SCHEMA[key].secret && value === config.SECRET_MASK) continue;
       config.set(key, value);
     }
+    if ('AUTO_SCAN_MODE' in body || 'AUTO_SCAN_TIME' in body) autoscan.reconfigure();
     return config.describeAll();
   });
 
@@ -680,6 +682,12 @@ async function main() {
     reply.code(202);
     return { status: 'scan_started', mediaDir: MEDIA_DIR };
   });
+
+  // Automatic scanning (src/autoscan.js): current mode/time plus when it
+  // last ran / will run next. Changing it goes through PUT /api/settings/config.
+  fastify.get('/api/autoscan', async () => ({
+    ...autoscan.status(),
+  }));
 
   fastify.get('/api/scan/status', async () => {
     const last = db.prepare('SELECT * FROM scan_log ORDER BY id DESC LIMIT 1').get();
@@ -1685,6 +1693,7 @@ async function main() {
   await fastify.listen({ port: PORT, host: '0.0.0.0' });
   fastify.log.info(`Media server listening on port ${PORT}, serving ${MEDIA_DIR}`);
   startTranscodeCleanup();
+  autoscan.start(fastify.log);
 }
 
 main().catch((err) => {

@@ -175,7 +175,7 @@ const ADMIN_ONLY = [
   ['POST', /^\/api\/library\/(purge|retry-unmatched|backfill-genres)$/],
   ['DELETE', /^\/api\/library$/], ['POST', /^\/api\/library\/\d+\/rematch$/],
   ['GET', /^\/api\/library\/unmatched$/],
-  ['GET', /^\/api\/logs\/download$/],
+  ['GET', /^\/api\/logs\/download$/], ['GET', /^\/api\/autoscan$/],
   ['POST', /^\/api\/streams\/[^/]+\/stop$/],
 ];
 const isAdminOnly = (method, p) => ADMIN_ONLY.some(([m, re]) => (m === '*' || m === method) && re.test(p));

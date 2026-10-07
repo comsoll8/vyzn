@@ -60,6 +60,18 @@ const SCHEMA = {
     envVar: 'TRANSCODE_MAX_GB', secret: false,
     label: 'Transcode Cache: Max Size (GB)', hint: 'Also delete least-recently-used streams to stay under this. 0 = no cap (default)',
   },
+  AUTO_SCAN_MODE: {
+    envVar: 'AUTO_SCAN_MODE', secret: false, hidden: true,
+    label: 'Automatic scanning', hint: 'off, daily, or watch',
+  },
+  AUTO_SCAN_TIME: {
+    envVar: 'AUTO_SCAN_TIME', secret: false, hidden: true,
+    label: 'Automatic scan time', hint: 'HH:MM, 24-hour, server time',
+  },
+  AUTO_SCAN_LAST_DAILY: {
+    envVar: 'AUTO_SCAN_LAST_DAILY', secret: false, hidden: true,
+    label: 'Last daily scan date', hint: 'internal',
+  },
   TAILSCALE_AUTHKEY: {
     envVar: 'TAILSCALE_AUTHKEY', secret: true,
     label: 'Tailscale Auth Key', hint: 'One-off or reusable key from the Tailscale admin console',
@@ -122,6 +134,7 @@ function describeAll() {
   const overridden = new Set(getAllStmt.all().map((r) => r.key));
   const out = {};
   for (const [key, schema] of Object.entries(SCHEMA)) {
+    if (schema.hidden) continue; // internal/dedicated-UI settings
     const effective = get(key);
     const hasValue = Boolean(effective);
     out[key] = {

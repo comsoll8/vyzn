@@ -2714,3 +2714,8 @@ select:focus-visible,
 .admin-pane-title { margin: 0 0 8px; font-size: 1.2rem; }
 .admin-settings-pane { max-width: 760px; }
 .admin-settings-pane .settings-section:first-of-type { border-top: 1px solid rgba(255,255,255,.08); padding-top: 18px; margin-top: 18px; }
+.config-field select, .config-field input[type="time"] {
+  background: #161616; border: 1px solid rgba(255,255,255,.08); color: var(--text);
+  padding: 8px 12px; border-radius: 6px; font-size: 13px; color-scheme: dark;
+}
+.autoscan-form { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }

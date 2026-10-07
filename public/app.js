@@ -3868,7 +3868,40 @@ function openSettings() {
 // Tailscale, accounts) — they live in the admin dashboard's Server Settings
 // tab for admins (see admin.js), or in the Settings overlay while sign-in
 // is off. Either way these loaders fill them.
+const autoScanModeEl = document.getElementById('autoScanMode');
+const autoScanTimeEl = document.getElementById('autoScanTime');
+const autoScanTimeWrapEl = document.getElementById('autoScanTimeWrap');
+const autoScanStatusEl = document.getElementById('autoScanStatus');
+autoScanModeEl.addEventListener('change', () => {
+  autoScanTimeWrapEl.classList.toggle('hidden', autoScanModeEl.value !== 'daily');
+});
+async function loadAutoScan() {
+  const r = await fetch('/api/autoscan');
+  if (!r.ok) return;
+  const s = await r.json();
+  autoScanModeEl.value = s.mode;
+  autoScanTimeEl.value = s.time;
+  autoScanTimeWrapEl.classList.toggle('hidden', s.mode !== 'daily');
+  const parts = [];
+  if (s.mode === 'daily') parts.push(`Next scan ${new Date(s.nextRun).toLocaleString()} (server clock: ${s.timezone}).`);
+  if (s.mode === 'watch') parts.push(s.watching ? 'Watching your library folders for new files.' : `Not watching: ${s.watchError || 'starting…'}`);
+  if (s.lastAuto) parts.push(`Last automatic scan ${new Date(s.lastAuto.at).toLocaleString()} (${s.lastAuto.reason})${s.lastAuto.error ? ' — failed: ' + s.lastAuto.error : ''}.`);
+  if (s.scanning) parts.push('A scan is running now.');
+  autoScanStatusEl.textContent = parts.join(' ') || 'Automatic scanning is off.';
+}
+document.getElementById('autoScanForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  autoScanStatusEl.textContent = 'Saving…';
+  const res = await fetch('/api/settings/config', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ AUTO_SCAN_MODE: autoScanModeEl.value, AUTO_SCAN_TIME: autoScanTimeEl.value || '03:00' }),
+  });
+  if (!res.ok) { autoScanStatusEl.textContent = 'Could not save.'; return; }
+  await loadAutoScan();
+});
+
 function loadAdminSettingsData() {
+  loadAutoScan();
   settingsScanInfoEl.textContent = '';
   configSaveStatusEl.textContent = '';
   loadSettingsSystemInfo();

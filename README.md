@@ -260,7 +260,8 @@ for "am I up to date."
   sign-in").
 - **v0.5.0** — Tautulli-style admin dashboard (live activity,
   play log, stats charts, user management) and 25 built-in profile pictures.
-- **v0.5.2** (current) — DVD/Blu-ray extras (bonus content, deleted scenes, alternate endings, trailers) are no longer indexed as extra copies of a movie, and ones already indexed are removed on the next scan.
+- **v0.5.3** (current) — automatic library scanning (daily at a set time, or when new files appear).
+- **v0.5.2** — DVD/Blu-ray extras (bonus content, deleted scenes, alternate endings, trailers) are no longer indexed as extra copies of a movie, and ones already indexed are removed on the next scan.
 - **v0.5.1** — hamburger menu replaced by pill tabs in the top bar (matching the
   admin dashboard); Control Center spacing fixed; the genre pill now appears
   only on Movies and TV Shows (where it filters the grid), not Home; the admin dashboard has a "Back to VYZN" button and responds to
@@ -1082,6 +1083,18 @@ the host automatically, so this should work out of the box on Unraid.
   driver issues.
 
 ## What gets scanned
+
+**Automatic scanning.** Settings > Server Settings (admin dashboard) >
+Automatic scanning: *Off*, *Once a day* (at a time you choose, on the
+server's clock — set `TZ` in docker-compose to change the timezone; if the
+server was off at that time it catches up on next start), or *When files
+change* (watches your Movies/TV folders and scans two minutes after the last
+new video file appears, so a download that's still copying finishes first).
+The watcher uses inotify, so it doesn't wake sleeping Unraid disks; if a
+share doesn't report changes (some network mounts), use *Once a day*, or set
+`AUTO_SCAN_POLL=true` to poll instead. Defaults can be set with
+`AUTO_SCAN_MODE` (`off`/`daily`/`watch`) and `AUTO_SCAN_TIME` (`03:00`).
+Only one scan runs at a time. Files that were *removed* are not detected yet.
 
 **Extras / bonus content.** Movie files that are DVD/Blu-ray extras are
 skipped so they don't show up as duplicate "versions" of the movie: anything
