@@ -21,3 +21,6 @@ android-tv/.cxx/
 android-tv/keystore.properties
 android-tv/*.jks
 android-tv/*.keystore
+
+# The fixed *debug* key (see android-tv/app/build.gradle.kts) is committed on purpose.
+!android-tv/debug.keystore

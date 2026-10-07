@@ -44,6 +44,16 @@ android {
     }
 
     signingConfigs {
+        // A fixed debug key (committed on purpose — it only signs side-loaded
+        // test builds, never Play releases) so every build, local or from
+        // GitHub Actions, is signed the same and installs as an update over
+        // the previous one instead of failing with "package conflicts".
+        getByName("debug") {
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
         if (hasKeystoreProperties) {
             create("release") {
                 storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))

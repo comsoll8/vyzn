@@ -260,7 +260,8 @@ for "am I up to date."
   sign-in").
 - **v0.5.0** — Tautulli-style admin dashboard (live activity,
   play log, stats charts, user management) and 25 built-in profile pictures.
-- **v0.5.4** (current) — with sign-in on, old Android TV app builds fall back to the in-page player instead of failing with `ERROR_CODE_IO_BAD_HTTP_STATUS`; the new app build (tv-v3) forwards the login to the native player.
+- **v0.5.5** (current) — the TV app's native player now also sends the login as a Bearer token and shows the HTTP status in playback errors; Android builds use one fixed debug key so they update in place.
+- **v0.5.4** — with sign-in on, old Android TV app builds fall back to the in-page player instead of failing with `ERROR_CODE_IO_BAD_HTTP_STATUS`; the new app build (tv-v3) forwards the login to the native player.
 - **v0.5.3** — automatic library scanning (daily at a set time, or when new files appear).
 - **v0.5.2** — DVD/Blu-ray extras (bonus content, deleted scenes, alternate endings, trailers) are no longer indexed as extra copies of a movie, and ones already indexed are removed on the next scan.
 - **v0.5.1** — hamburger menu replaced by pill tabs in the top bar (matching the
