@@ -23,7 +23,9 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -71,6 +73,9 @@ class PlayerActivity : AppCompatActivity() {
     private var countdownRunnable: Runnable? = null
 
     private var serverBaseUrl: String = ""
+    // Session cookie copied from the WebView (VYZN accounts, see src/auth.js).
+    // Empty when sign-in is off, in which case no header is sent.
+    private var authCookie: String = ""
     private var itemId: Long = -1
     private var profileId: Long = -1
     private var resumeSeconds: Double = 0.0
@@ -107,6 +112,7 @@ class PlayerActivity : AppCompatActivity() {
         progressExecutor = Executors.newSingleThreadExecutor()
 
         serverBaseUrl = intent.getStringExtra(EXTRA_SERVER_BASE_URL) ?: ""
+        authCookie = intent.getStringExtra(EXTRA_AUTH_COOKIE) ?: ""
         itemId = intent.getLongExtra(EXTRA_ITEM_ID, -1)
         profileId = intent.getLongExtra(EXTRA_PROFILE_ID, -1)
         resumeSeconds = intent.getDoubleExtra(EXTRA_RESUME_SECONDS, 0.0)
@@ -155,7 +161,11 @@ class PlayerActivity : AppCompatActivity() {
         // own 15s "Instant Replay" jump instead of ExoPlayer's 10s/15s-ish
         // defaults, and is what the stock rewind/fast-forward buttons
         // (shown via PlayerView's default controller) actually invoke.
+        val httpFactory = DefaultHttpDataSource.Factory().apply {
+            if (authCookie.isNotEmpty()) setDefaultRequestProperties(mapOf("Cookie" to authCookie))
+        }
         val exoPlayer = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(httpFactory))
             .setSeekBackIncrementMs(15000)
             .setSeekForwardIncrementMs(15000)
             .build()
@@ -302,6 +312,7 @@ class PlayerActivity : AppCompatActivity() {
                 requestMethod = "GET"
                 connectTimeout = 5000
                 readTimeout = 5000
+                applyAuth(this)
             }
             if (connection.responseCode != HttpURLConnection.HTTP_OK) return null
             val body = BufferedReader(InputStreamReader(connection.inputStream)).use { it.readText() }
@@ -408,12 +419,21 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    // Attach the account cookie, but only to requests going to our own
+    // server (Up Next thumbnails can come from third-party hosts).
+    private fun applyAuth(conn: HttpURLConnection) {
+        if (authCookie.isNotEmpty() && conn.url.toString().startsWith(serverBaseUrl)) {
+            conn.setRequestProperty("Cookie", authCookie)
+        }
+    }
+
     private fun fetchBitmap(url: String): Bitmap? {
         var connection: HttpURLConnection? = null
         return try {
             connection = (URL(url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 5000
                 readTimeout = 5000
+                applyAuth(this)
             }
             connection.inputStream.use { BitmapFactory.decodeStream(it) }
         } catch (e: Exception) {
@@ -469,6 +489,7 @@ class PlayerActivity : AppCompatActivity() {
                 setRequestProperty("Content-Type", "application/json")
                 connectTimeout = 5000
                 readTimeout = 5000
+                applyAuth(this)
             }
             val body = JSONObject().apply {
                 put("media_id", id)
@@ -502,6 +523,7 @@ class PlayerActivity : AppCompatActivity() {
                 requestMethod = "GET"
                 connectTimeout = 5000
                 readTimeout = 5000
+                applyAuth(this)
             }
             if (connection.responseCode != HttpURLConnection.HTTP_OK) return null
             val body = BufferedReader(InputStreamReader(connection.inputStream)).use { it.readText() }
@@ -546,5 +568,6 @@ class PlayerActivity : AppCompatActivity() {
         const val EXTRA_RESUME_SECONDS = "resume_seconds"
         const val EXTRA_DURATION_SECONDS = "duration_seconds"
         const val EXTRA_TITLE = "title"
+        const val EXTRA_AUTH_COOKIE = "auth_cookie"
     }
 }

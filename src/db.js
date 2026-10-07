@@ -16,6 +16,7 @@ const DB_PATH = path.join(DATA_DIR, 'library.db');
 const db = new Database(DB_PATH);
 
 db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS media_items (
@@ -186,6 +187,34 @@ db.exec(`
     value      TEXT,
     updated_at TEXT DEFAULT (datetime('now'))
   );
+`);
+
+// Accounts + login sessions (src/auth.js). Distinct from `profiles`: an
+// account is who may use the server at all (username/password), while a
+// profile is "who's watching" within the household (watch history,
+// parental limits). Until the first account exists the server stays fully
+// open exactly as before — see auth.js's authHook. Tokens are stored only
+// as SHA-256 hashes, so a leaked database file can't be replayed as
+// working logins; expires_at/last_used_at are epoch milliseconds.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    display_name  TEXT,
+    password_hash TEXT NOT NULL,
+    is_admin      INTEGER NOT NULL DEFAULT 0,
+    created_at    TEXT DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS auth_tokens (
+    token_hash   TEXT PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    label        TEXT,
+    created_at   INTEGER NOT NULL,
+    expires_at   INTEGER NOT NULL,
+    last_used_at INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS idx_auth_tokens_user ON auth_tokens(user_id);
 `);
 
 // tmdb_detail_cache predates `similar_source` (added when "More Like This"

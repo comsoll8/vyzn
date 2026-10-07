@@ -252,8 +252,12 @@ for "am I up to date."
 - **v0.3.3** — Seerr URL scheme fix, Home shelves shuffle together, Add to
   Library corner "+" button with long-press, removed the redundant "Not in
   library" badge, TMDB and Abyss attribution.
-- **v0.3.4** (current) — automatic transcode cache cleanup (the
+- **v0.3.4** — automatic transcode cache cleanup (the
   `/transcode` folder previously grew forever).
+- **v0.4.0** (current) — accounts and sign-in: login screen with QR
+  pairing from your phone, "Remember This Device", Sign Out, Settings >
+  Accounts. Off until you create the first account (see "Accounts &
+  sign-in").
 
 **Android TV app** (`android-tv/`, [all releases](https://github.com/comsoll8/vyzn/releases)):
 
@@ -1703,14 +1707,34 @@ transcodes again next time it's played. Active streams are never touched.
 The first sweep after upgrading clears any existing backlog, so the
 `rm -rf` by hand is optional.
 
+## Accounts & sign-in
+
+Until an account exists the server is open exactly as before. In
+**Settings > Accounts**, create the first account: sign-in is then required
+for every `/api/` and `/stream-files/` request, and that account is the
+admin (admins add or remove others). Passwords are stored as scrypt hashes;
+login tokens are stored only as SHA-256 hashes.
+
+- **Login screen**: username + password with "Remember This Device"
+  (token kept in `localStorage` as `vyzn_auth_token`, validated on start via
+  `GET /api/auth/verify`). **Sign Out** is in the Control Center.
+- **QR pairing**: the TV shows a QR code and a 6-digit code
+  (`http://<server>/pair?code=123456`). On your phone, open it and tap
+  *Approve TV Login* (or sign in once, which approves and signs the phone in
+  too). The TV picks up the approval within ~2 seconds. Codes last 5 minutes.
+- **Endpoints**: `POST /api/auth/login`, `GET /api/auth/verify`,
+  `POST /api/auth/logout`, `GET /api/auth/status`, `POST /api/auth/register`,
+  `POST /api/auth/pairing/session`, `GET /api/auth/pairing/status/:id`,
+  `POST /api/auth/pairing/approve`, `GET /api/auth/pairing/qr/:id`.
+- Locked out? Stop the container and delete the `users` rows from
+  `library.db` (`sqlite3 library.db "DELETE FROM users;"`) to return to open mode.
+
 ## Known limitations (intentional)
 
-- No authentication — this is meant for LAN-only use for now. Do **not**
-  port-forward 8080 to the internet as-is. The supported way to reach it
-  from outside your home is the built-in Tailscale panel (see "Remote
-  access via Tailscale" above) — it puts the server on a private mesh
-  network instead of the open internet, so the lack of an app-level login
-  isn't exposed to anything but your own other devices.
+- Sign-in is **off by default** (existing installs keep working). Once
+  you create the first account in Settings > Accounts it is enforced by the
+  server for everyone. There is no HTTPS built in, so still don't
+  port-forward to the internet; use the Tailscale panel for remote access.
 - TV shows now use a proper Show -> Season -> Episode hierarchy (see
   below) instead of flat per-episode tiles. Filenames that don't match a
   recognizable `S01E05`/`1x05`/`Season NN` pattern still fall back to a

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#07090d" />
+<title>Approve TV login · VYZN</title>
+<link rel="icon" type="image/png" sizes="48x48" href="/assets/favicon-48.png" />
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;background:#07090d;color:#eaf2f7;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  .card{width:100%;max-width:400px;padding:28px;border-radius:22px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);text-align:center}
+  img.logo{height:30px;margin-bottom:6px}
+  img.mark{width:64px;height:64px}
+  h1{font-size:1.3rem;margin:10px 0}
+  .code{font-size:2rem;letter-spacing:.2em;font-weight:700;margin:8px 0 16px;color:#00e5ff}
+  p{opacity:.8;line-height:1.5}
+  input{width:100%;padding:14px;margin:6px 0;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.4);color:inherit;font-size:16px}
+  button{width:100%;padding:15px;margin-top:10px;border:0;border-radius:12px;background:#00b8d4;color:#031015;font-weight:700;font-size:1.05rem}
+  button:disabled{opacity:.5}
+  .err{color:#ff6b6b;min-height:1.3em;margin-top:8px}
+  .ok{color:#6bffb0}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <img class="logo" src="/assets/vyzn-logo.svg" alt="VYZN" />
+  <div id="view-loading"><img class="mark" src="/assets/vyzn-mark-scanning.svg" alt="" /></div>
+
+  <div id="view-approve" class="hidden">
+    <h1>Approve TV login</h1>
+    <p>Make sure this code matches the one on your TV:</p>
+    <div class="code" id="codeA"></div>
+    <p id="who"></p>
+    <button id="approveBtn">Approve TV Login</button>
+  </div>
+
+  <form id="view-login" class="hidden">
+    <h1>Sign in to approve your TV</h1>
+    <div class="code" id="codeL"></div>
+    <input id="u" placeholder="Username or email" autocomplete="username" autocapitalize="none" required />
+    <input id="p" type="password" placeholder="Password" autocomplete="current-password" required />
+    <button type="submit" id="loginBtn">Sign in &amp; approve</button>
+  </form>
+
+  <div id="view-done" class="hidden"><h1 class="ok">✓ TV approved</h1><p>You can close this page — your TV is signing in.</p></div>
+  <div id="view-bad" class="hidden"><h1>No pairing code</h1><p>Scan the QR code shown on your TV again.</p></div>
+  <div class="err" id="err"></div>
+</div>
+<script>
+(function(){
+  var KEY='vyzn_auth_token';
+  var code=(new URLSearchParams(location.search).get('code')||'').replace(/\D/g,'').slice(0,6);
+  var $=function(i){return document.getElementById(i)};
+  function show(v){['loading','approve','login','done','bad'].forEach(function(n){$('view-'+n).classList.toggle('hidden',n!==v)})}
+  function tok(){try{return localStorage.getItem(KEY)}catch(e){return null}}
+  var pretty=code.slice(0,3)+' '+code.slice(3);
+  $('codeA').textContent=pretty;$('codeL').textContent=pretty;
+  function post(body,auth){
+    var h={'Content-Type':'application/json'};if(auth)h.Authorization='Bearer '+auth;
+    return fetch('/api/auth/pairing/approve',{method:'POST',headers:h,body:JSON.stringify(body)}).then(function(r){return r.json().then(function(d){return {ok:r.ok,status:r.status,d:d}})});
+  }
+  function done(r){
+    if(!r.ok){$('err').textContent=r.d.error==='invalid_credentials'?'Wrong username or password.':(r.d.error||'Something went wrong.');return false}
+    if(r.d.phoneToken){try{localStorage.setItem(KEY,r.d.phoneToken)}catch(e){}}
+    $('err').textContent='';show('done');return true;
+  }
+  if(code.length!==6){show('bad');return}
+  var t=tok();
+  (t?fetch('/api/auth/status',{headers:{Authorization:'Bearer '+t}}).then(function(r){return r.json()}):Promise.resolve({}))
+    .then(function(s){
+      if(s&&s.authenticated){$('who').textContent='Signed in as '+s.user.displayName+'.';show('approve')}
+      else show('login');
+    }).catch(function(){show('login')});
+  $('approveBtn').onclick=function(){this.disabled=true;var b=this;post({code:code},tok()).then(function(r){if(!done(r))b.disabled=false})};
+  $('view-login').onsubmit=function(e){e.preventDefault();$('loginBtn').disabled=true;
+    post({code:code,username:$('u').value,password:$('p').value}).then(function(r){if(!done(r))$('loginBtn').disabled=false})};
+})();
+</script>
+</body>
+</html>

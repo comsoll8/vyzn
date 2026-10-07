@@ -423,6 +423,8 @@ const SPATIAL_NAV_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function getSpatialNavRoot() {
+  const loginEl = document.getElementById('loginOverlay');
+  if (loginEl && !loginEl.classList.contains('hidden')) return loginEl;
   if (!appSwitcherOverlayEl.classList.contains('hidden')) return appSwitcherOverlayEl;
   if (!controlCenterEl.classList.contains('hidden')) return controlCenterEl;
   if (!navMenuEl.classList.contains('hidden')) return navMenuEl;
@@ -3831,6 +3833,7 @@ wipeLibraryBtn.addEventListener('click', async () => {
 
 function openSettings() {
   settingsOverlayEl.classList.remove('hidden');
+  if (window.VyznAuth) window.VyznAuth.refreshAccounts();
   settingsScanInfoEl.textContent = '';
   configSaveStatusEl.textContent = '';
   settingsAudioPrefSelectEl.value = localStorage.getItem(AUDIO_PREF_KEY) || '';
@@ -3876,6 +3879,7 @@ function openUnmatched() {
 function closeUnmatched() {
   hideUnmatchedInternal();
   settingsOverlayEl.classList.remove('hidden');
+  if (window.VyznAuth) window.VyznAuth.refreshAccounts();
 }
 
 openUnmatchedBtn.addEventListener('click', openUnmatched);
@@ -3886,6 +3890,9 @@ unmatchedOverlayEl.addEventListener('click', (e) => {
 
 // Watch for progress from a scan already running (e.g. triggered from
 // another tab, or a scheduled scan) as soon as the page loads.
-connectScanProgress();
-
-initProfiles();
+// Wait for auth (auth.js): the scan EventSource and profile fetch would
+// 401 before sign-in once accounts are enabled.
+window.VyznAuth.ready.then(() => {
+  connectScanProgress();
+  initProfiles();
+});

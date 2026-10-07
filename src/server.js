@@ -55,6 +55,7 @@ const ratings = require('./ratings');
 const seerr = require('./seerr');
 const config = require('./config');
 const tailscale = require('./tailscale');
+const auth = require('./auth');
 
 // Plain X.Y.Z numeric comparison for the "Check for Updates" route —
 // returns >0 if `a` is newer than `b`. Not full semver (no pre-release/
@@ -384,7 +385,9 @@ function clearPoisonedDetailCache() {
 async function main() {
   clearPoisonedDetailCache();
 
-  await fastify.register(cors, { origin: true });
+  // credentials:true so the browser keeps sending the vyzn_auth cookie.
+  await fastify.register(cors, { origin: true, credentials: true });
+  auth.register(fastify);
 
   // Serve HLS segments/playlists as static files once ffmpeg has written them.
   await fastify.register(fastifyStatic, {

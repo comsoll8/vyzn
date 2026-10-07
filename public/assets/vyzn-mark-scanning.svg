@@ -32,16 +32,16 @@
       }
 
       .pulse-outer {
-        animation: neonPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        animation: neonPulse 3.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
       }
 
       .pulse-core {
-        animation: neonPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite 0.3s;
+        animation: neonPulse 3.6s cubic-bezier(0.4, 0, 0.6, 1) infinite 0.54s;
       }
 
       .pulse-line {
         stroke-dasharray: 110;
-        animation: lineSweep 2s ease-in-out infinite 0.6s;
+        animation: lineSweep 3.6s ease-in-out infinite 1.08s;
       }
     </style>
   </defs>

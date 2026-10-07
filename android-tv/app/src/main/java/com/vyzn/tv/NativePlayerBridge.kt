@@ -3,6 +3,7 @@ package com.vyzn.tv
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import org.json.JSONObject
 
@@ -31,6 +32,7 @@ class NativePlayerBridge(private val context: Context, private val serverBaseUrl
             }
             val intent = Intent(context, PlayerActivity::class.java).apply {
                 putExtra(PlayerActivity.EXTRA_SERVER_BASE_URL, baseUrl)
+                putExtra(PlayerActivity.EXTRA_AUTH_COOKIE, CookieManager.getInstance().getCookie(baseUrl) ?: "")
                 putExtra(PlayerActivity.EXTRA_ITEM_ID, payload.optLong("itemId", -1))
                 putExtra(PlayerActivity.EXTRA_PROFILE_ID, payload.optLong("profileId", -1))
                 putExtra(PlayerActivity.EXTRA_RESUME_SECONDS, payload.optDouble("resumeSeconds", 0.0))

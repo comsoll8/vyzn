@@ -28,6 +28,44 @@
 </head>
 <body>
 
+  <!-- Login & profile gateway: the app's entry point once an account exists
+       (see src/auth.js). Left: QR pairing; right: credentials. -->
+  <div id="loginOverlay" class="login-overlay hidden" role="dialog" aria-label="Sign in to VYZN">
+    <div class="login-split">
+      <section class="login-left">
+        <img src="/assets/vyzn-mark-scanning.svg" alt="" class="login-mark" />
+        <img src="/assets/vyzn-logo.svg" alt="VYZN" class="login-wordmark" />
+        <h2>Scan to sign in</h2>
+        <div class="login-qr-wrap">
+          <img id="loginQr" class="login-qr" alt="QR code to sign in from your phone" />
+          <div id="loginQrExpired" class="login-qr-expired hidden">Code expired</div>
+        </div>
+        <div id="loginCode" class="login-code" aria-live="polite"></div>
+        <ol class="login-steps">
+          <li>Open the camera on your phone</li>
+          <li>Tap the link, then approve this TV</li>
+        </ol>
+        <button id="loginQrRefresh" type="button" class="btn-secondary login-refresh">Refresh QR code</button>
+      </section>
+      <section class="login-right">
+        <form id="loginForm" class="login-card" autocomplete="on">
+          <h1>Sign in</h1>
+          <label for="loginUser">Username or email</label>
+          <input id="loginUser" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required />
+          <label for="loginPass">Password</label>
+          <input id="loginPass" name="password" type="password" autocomplete="current-password" required />
+          <label class="login-remember" for="loginRemember">
+            <input id="loginRemember" type="checkbox" checked /> Remember This Device
+          </label>
+          <div id="loginError" class="login-error" role="alert"></div>
+          <button id="loginSubmit" type="submit" class="login-submit">Sign In</button>
+        </form>
+      </section>
+    </div>
+  </div>
+
+  <div id="vyznToast" class="vyzn-toast" role="status" aria-live="polite"></div>
+
   <!-- Profile picker: shown until a profile is chosen (stored in localStorage) -->
   <div id="profileGate" class="profile-gate hidden">
     <img src="/assets/vyzn-logo.svg" alt="VYZN" class="gate-logo" />
@@ -289,6 +327,19 @@
         </div>
       </section>
 
+      <section class="settings-section" id="accountsSection">
+        <h3>Accounts</h3>
+        <p id="accountsIntro" class="settings-hint"></p>
+        <div id="accountsList" class="accounts-list"></div>
+        <form id="accountForm" class="accounts-form">
+          <input id="accName" type="text" placeholder="Username" autocomplete="off" autocapitalize="none" required />
+          <input id="accDisplay" type="text" placeholder="Display name (optional)" autocomplete="off" />
+          <input id="accPass" type="password" placeholder="Password (6+ characters)" autocomplete="new-password" required />
+          <button type="submit" id="accSubmit">Create account</button>
+          <div id="accMsg" class="login-error"></div>
+        </form>
+      </section>
+
       <!-- Required by TMDB's API Terms of Use: a visible attribution notice
            in an About/Credits section, linking to themoviedb.org, referring
            to them only as "TMDB" or "The Movie Database". See
@@ -331,7 +382,8 @@
     <section class="cc-section">
       <h3>Switch Profile</h3>
       <div id="ccProfileList" class="cc-profile-list"></div>
-      <button id="ccSwitchToGateBtn" class="btn-secondary cc-full-btn">All Profiles / Sign Out</button>
+      <button id="ccSwitchToGateBtn" class="btn-secondary cc-full-btn">All Profiles</button>
+      <button id="ccSignOutBtn" class="btn-secondary cc-full-btn hidden">Sign Out</button>
     </section>
 
     <section class="cc-section">
@@ -548,6 +600,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+  <script src="/auth.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>
