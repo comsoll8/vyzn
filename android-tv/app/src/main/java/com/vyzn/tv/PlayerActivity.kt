@@ -76,6 +76,9 @@ class PlayerActivity : AppCompatActivity() {
     // Session cookie copied from the WebView (VYZN accounts, see src/auth.js).
     // Empty when sign-in is off, in which case no header is sent.
     private var authCookie: String = ""
+    // Same login as a Bearer token (from the web app's localStorage) — more
+    // reliable than the WebView cookie store, so both are sent.
+    private var authToken: String = ""
     private var itemId: Long = -1
     private var profileId: Long = -1
     private var resumeSeconds: Double = 0.0
@@ -113,6 +116,7 @@ class PlayerActivity : AppCompatActivity() {
 
         serverBaseUrl = intent.getStringExtra(EXTRA_SERVER_BASE_URL) ?: ""
         authCookie = intent.getStringExtra(EXTRA_AUTH_COOKIE) ?: ""
+        authToken = intent.getStringExtra(EXTRA_AUTH_TOKEN) ?: ""
         itemId = intent.getLongExtra(EXTRA_ITEM_ID, -1)
         profileId = intent.getLongExtra(EXTRA_PROFILE_ID, -1)
         resumeSeconds = intent.getDoubleExtra(EXTRA_RESUME_SECONDS, 0.0)
@@ -162,7 +166,10 @@ class PlayerActivity : AppCompatActivity() {
         // defaults, and is what the stock rewind/fast-forward buttons
         // (shown via PlayerView's default controller) actually invoke.
         val httpFactory = DefaultHttpDataSource.Factory().apply {
-            if (authCookie.isNotEmpty()) setDefaultRequestProperties(mapOf("Cookie" to authCookie))
+            val props = HashMap<String, String>()
+            if (authCookie.isNotEmpty()) props["Cookie"] = authCookie
+            if (authToken.isNotEmpty()) props["Authorization"] = "Bearer $authToken"
+            if (props.isNotEmpty()) setDefaultRequestProperties(props)
         }
         val exoPlayer = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(this).setDataSourceFactory(httpFactory))
@@ -208,9 +215,15 @@ class PlayerActivity : AppCompatActivity() {
         exoPlayer.addListener(object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 Log.e(TAG, "Playback error for item $itemId", error)
+                // Surface the HTTP status (401 = not signed in, 404 = file
+                // missing...) instead of just the generic error name.
+                val http = generateSequence<Throwable>(error) { it.cause }
+                    .filterIsInstance<androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException>()
+                    .firstOrNull()
+                val detail = if (http != null) " (HTTP ${http.responseCode})" else ""
                 Toast.makeText(
                     this@PlayerActivity,
-                    "Playback failed: ${error.errorCodeName}",
+                    "Playback failed: ${error.errorCodeName}$detail",
                     Toast.LENGTH_LONG
                 ).show()
                 finish()
@@ -422,8 +435,9 @@ class PlayerActivity : AppCompatActivity() {
     // Attach the account cookie, but only to requests going to our own
     // server (Up Next thumbnails can come from third-party hosts).
     private fun applyAuth(conn: HttpURLConnection) {
-        if (authCookie.isNotEmpty() && conn.url.toString().startsWith(serverBaseUrl)) {
-            conn.setRequestProperty("Cookie", authCookie)
+        if (conn.url.toString().startsWith(serverBaseUrl)) {
+            if (authCookie.isNotEmpty()) conn.setRequestProperty("Cookie", authCookie)
+            if (authToken.isNotEmpty()) conn.setRequestProperty("Authorization", "Bearer $authToken")
         }
     }
 
@@ -569,5 +583,6 @@ class PlayerActivity : AppCompatActivity() {
         const val EXTRA_DURATION_SECONDS = "duration_seconds"
         const val EXTRA_TITLE = "title"
         const val EXTRA_AUTH_COOKIE = "auth_cookie"
+        const val EXTRA_AUTH_TOKEN = "auth_token"
     }
 }

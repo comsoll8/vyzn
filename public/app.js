@@ -2670,6 +2670,7 @@ async function openPlayer(item) {
       resumeSeconds: item.position_seconds || 0,
       durationSeconds: item.duration_sec || 0,
       profileId: state.profile ? state.profile.id : null,
+      authToken: (window.VyznAuth && window.VyznAuth.getToken()) || '',
     }));
     return;
   }
