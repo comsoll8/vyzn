@@ -400,6 +400,7 @@ window.addEventListener('popstate', () => {
   hideUnmatchedInternal();
   hideControlCenterInternal();
   hideAppSwitcherInternal();
+  if (window.hideAdminInternal) window.hideAdminInternal();
 });
 
 // --- D-pad / remote-control spatial navigation ----------------------------

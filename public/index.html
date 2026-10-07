@@ -76,7 +76,7 @@
   <!-- Admin dashboard (Tautulli-style): live activity, play log, stats, users. admin.js -->
   <div id="adminOverlay" class="admin-overlay hidden" role="dialog" aria-label="Admin dashboard">
     <header class="admin-top">
-      <img src="/assets/vyzn-mark.svg" alt="" class="admin-top-mark" />
+      <button type="button" id="adminBack" class="admin-back" aria-label="Back to VYZN">&#8249; Back to VYZN</button>
       <h2>Dashboard</h2>
       <nav class="admin-tabs" id="adminTabs">
         <button type="button" data-tab="activity" class="active">Activity</button>
@@ -84,7 +84,6 @@
         <button type="button" data-tab="stats">Stats</button>
         <button type="button" data-tab="users">Users</button>
       </nav>
-      <button type="button" id="adminClose" class="close-btn" aria-label="Close">&times;</button>
     </header>
     <main id="adminBody" class="admin-body"></main>
   </div>

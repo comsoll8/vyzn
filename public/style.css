@@ -2704,3 +2704,8 @@ select:focus-visible,
 .cc-section .cc-full-btn + .cc-full-btn { margin-top: 10px; }
 .cc-profile-list { gap: 8px; margin-bottom: 16px; }
 .cc-quick-actions { gap: 10px; margin-bottom: 0; }
+
+.admin-back { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.06); color: var(--text); font-size: 14px; cursor: pointer; }
+.admin-back:hover { background: rgba(255,255,255,.14); }
+.admin-back:focus-visible { outline: none; border-color: #00e5ff; }
+.admin-tabs { margin-left: 4px; }

@@ -193,12 +193,16 @@
     else if (t === 'stats') renderStats();
     else renderUsers();
   }
-  function open() { overlay.classList.remove('hidden'); show(tab); const first = overlay.querySelector('#adminTabs button.active'); if (first) first.focus(); }
-  function close() { overlay.classList.add('hidden'); clearInterval(liveTimer); liveTimer = null; }
+  function open() { overlay.classList.remove('hidden'); if (typeof enterOverlay === 'function') enterOverlay(); show(tab); $('adminBack').focus(); }
+  function hide() { overlay.classList.add('hidden'); clearInterval(liveTimer); liveTimer = null; }
+  // Goes through browser history like every other overlay, so the TV remote's
+  // Back key (WebView.goBack) closes the dashboard too.
+  function close() { if (typeof exitOverlay === 'function') exitOverlay(hide); else hide(); }
+  window.hideAdminInternal = hide;
 
   $('adminTabs').addEventListener('click', (e) => { const b = e.target.closest('button[data-tab]'); if (b) show(b.dataset.tab); });
-  $('adminClose').addEventListener('click', close);
+  $('adminBack').addEventListener('click', close);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !overlay.classList.contains('hidden')) { e.stopPropagation(); close(); } }, true);
-  $('ccAdminBtn').addEventListener('click', () => { const cc = $('closeControlCenter'); if (cc) cc.click(); open(); });
+  $('ccAdminBtn').addEventListener('click', () => { if (typeof hideControlCenterInternal === 'function') hideControlCenterInternal(); open(); });
   document.addEventListener('vyzn-auth-changed', () => $('ccAdminBtn').classList.toggle('hidden', !(window.VyznAuth && window.VyznAuth.isAdmin())));
 })();
