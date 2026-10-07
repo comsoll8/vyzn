@@ -258,8 +258,10 @@ for "am I up to date."
   pairing from your phone, "Remember This Device", Sign Out, Settings >
   Accounts. Off until you create the first account (see "Accounts &
   sign-in").
-- **v0.5.0** (current) — Tautulli-style admin dashboard (live activity,
+- **v0.5.0** — Tautulli-style admin dashboard (live activity,
   play log, stats charts, user management) and 25 built-in profile pictures.
+- **v0.5.1** (current) — hamburger menu replaced by pill tabs in the top bar (matching the
+  admin dashboard); Control Center spacing fixed.
 
 **Android TV app** (`android-tv/`, [all releases](https://github.com/comsoll8/vyzn/releases)):
 

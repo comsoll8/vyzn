@@ -112,16 +112,21 @@
          pieces getting out of sync. -->
     <div class="app-nav">
       <header class="topbar">
-        <button id="navMenuBtn" class="hamburger-btn" type="button" aria-label="Menu" aria-expanded="false">
-          <span></span><span></span><span></span>
-        </button>
         <!-- Swapped to vyzn-mark-scanning.svg (pulsing) for the duration of
              a library scan by showScanProgress()/hideScanProgress() in
              app.js — see settingsScanProgressWrap below for the actual
              percent/stage text, which now lives in Settings instead of a
              bar across the top of every page. -->
         <img id="topbarLogo" src="/assets/vyzn-mark.svg" alt="VYZN" class="topbar-logo" />
+        <!-- Pill tabs live right in the topbar (same look as the admin
+             dashboard's tabs); the old hamburger drawer is gone. -->
+        <nav class="top-tabs" id="topTabs" aria-label="Library sections">
+          <button class="tab-btn active" data-tab="home">Home</button>
+          <button class="tab-btn" data-tab="movies">Movies</button>
+          <button class="tab-btn" data-tab="tv">TV Shows</button>
+        </nav>
         <div class="topbar-spacer"></div>
+        <input id="search" type="search" placeholder="Search" autocomplete="off" aria-label="Search" />
 
         <!-- Genre quick-filter: collapsed into a single floating pill next
              to the other topbar icon buttons instead of its own full-width
@@ -139,26 +144,7 @@
           <span id="activeProfileName"></span>
         </button>
 
-        <!-- Collapsible nav menu (Apple-style hamburger dropdown): Home/
-             Movies/TV Shows and Search sit directly in the topbar at once —
-             this tucks them behind one button so the bar itself stays
-             quiet, and only opens the drawer when you actually want to
-             navigate. Settings and Scan Library used to live here too, but
-             they're actions on the server, not navigation, so they moved to
-             Control Center (the profile-avatar panel) instead — see its
-             Quick Actions section. Nested inside the topbar (rather than a
-             sibling) so it can anchor right under it with plain
-             `position: absolute; top: 100%`. -->
-        <nav id="navMenu" class="nav-menu hidden">
-          <div class="nav-menu-tabs">
-            <button class="tab-btn active" data-tab="home">Home</button>
-            <button class="tab-btn" data-tab="movies">Movies</button>
-            <button class="tab-btn" data-tab="tv">TV Shows</button>
-          </div>
-          <input id="search" type="search" placeholder="Search title..." autocomplete="off" />
-        </nav>
       </header>
-      <div id="navMenuScrim" class="nav-menu-scrim hidden"></div>
     </div>
 
     <!-- Hero spotlight header: shown on the Home tab only -->

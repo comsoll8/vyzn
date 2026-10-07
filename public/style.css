@@ -2686,3 +2686,21 @@ select:focus-visible,
 .adm-prof-av img { width: 100%; height: 100%; display: block; }
 .new-profile-form .new-profile-avatar-btn { width: 52px; height: 52px; padding: 0; background: transparent; border: 2px solid transparent; border-radius: 14px; display: inline-flex; }
 .new-profile-form .new-profile-avatar-btn img { width: 100%; height: 100%; }
+
+/* ---- Home top bar: pill tabs inline (replaces the hamburger drawer) ---- */
+.top-tabs { display: flex; gap: 6px; margin-left: 8px; flex-wrap: wrap; }
+.tab-btn { background: rgba(255,255,255,.06); border: 1px solid transparent; color: var(--text); padding: 8px 18px; font-size: 14px; }
+.tab-btn:hover:not(.active) { background: rgba(255,255,255,.12); color: var(--text); border-color: transparent; }
+.tab-btn:focus-visible { outline: none; border-color: #00e5ff; }
+#search { flex: 0 1 220px; min-width: 120px; }
+@media (max-width: 640px) {
+  .top-tabs { order: 5; width: 100%; margin-left: 0; }
+  #search { flex: 1 1 120px; }
+}
+
+/* ---- Control Center spacing ---- */
+.cc-section { margin-top: 22px; padding-top: 22px; }
+.cc-section .cc-full-btn { display: block; margin: 0; padding: 12px 16px; }
+.cc-section .cc-full-btn + .cc-full-btn { margin-top: 10px; }
+.cc-profile-list { gap: 8px; margin-bottom: 16px; }
+.cc-quick-actions { gap: 10px; margin-bottom: 0; }

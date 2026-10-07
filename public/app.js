@@ -99,9 +99,6 @@ function loadingMarkup(text, opts = {}) {
 const controlCenterBtn = document.getElementById('controlCenterBtn');
 const activeProfileNameEl = document.getElementById('activeProfileName');
 const appSwitcherBtn = document.getElementById('appSwitcherBtn');
-const navMenuBtn = document.getElementById('navMenuBtn');
-const navMenuEl = document.getElementById('navMenu');
-const navMenuScrimEl = document.getElementById('navMenuScrim');
 
 const genreFilterBtn = document.getElementById('genreFilterBtn');
 const genreFilterLabelEl = document.getElementById('genreFilterLabel');
@@ -403,7 +400,6 @@ window.addEventListener('popstate', () => {
   hideUnmatchedInternal();
   hideControlCenterInternal();
   hideAppSwitcherInternal();
-  hideNavMenuInternal();
 });
 
 // --- D-pad / remote-control spatial navigation ----------------------------
@@ -430,7 +426,6 @@ function getSpatialNavRoot() {
   if (loginEl && !loginEl.classList.contains('hidden')) return loginEl;
   if (!appSwitcherOverlayEl.classList.contains('hidden')) return appSwitcherOverlayEl;
   if (!controlCenterEl.classList.contains('hidden')) return controlCenterEl;
-  if (!navMenuEl.classList.contains('hidden')) return navMenuEl;
   if (!genrePillsEl.classList.contains('hidden')) return genrePillsEl;
   if (!playerEl.classList.contains('hidden')) return playerEl;
   if (!movieDetailEl.classList.contains('hidden')) return movieDetailEl;
@@ -3217,7 +3212,6 @@ document.addEventListener('keydown', (e) => {
     else if (!movieDetailEl.classList.contains('hidden')) closeMovieDetail();
     else if (!showDetailEl.classList.contains('hidden')) closeShowDetail();
     else if (!settingsOverlayEl.classList.contains('hidden')) closeSettings();
-    else if (!navMenuEl.classList.contains('hidden')) closeNavMenu();
     return;
   }
 
@@ -3225,66 +3219,6 @@ document.addEventListener('keydown', (e) => {
     if (controlCenterEl.classList.contains('hidden')) openControlCenter();
     else closeControlCenter();
   }
-});
-
-// --- Hamburger nav menu (Apple-style collapsed topbar) ---------------------
-// Home/Movies/TV Shows, Search, Settings, and Scan Library all used to sit
-// directly in the topbar; they now live in this dropdown so the bar itself
-// stays down to just the logo and a couple of icon buttons. Participates in
-// the same back/swipe-to-close history mechanism as the other overlays.
-//
-// Reparented to <body> (same fix as #movieDetailMenu above) because it was
-// nested inside .app-nav, which is `position: sticky` with its own
-// z-index — that makes .app-nav a stacking context, and a descendant's
-// z-index only ever wins against elements *outside* that context up to
-// the context's own z-index (20 here). So no z-index on the menu itself
-// could ever paint it above a fixed, higher-z-index overlay like the
-// Movie/Show detail page — opening the menu over a detail page showed the
-// menu partially mixed in with/behind that page's own content instead of
-// cleanly on top of it. Reparenting escapes that trap entirely; a
-// max-height + overflow-y:auto in CSS is also a safety net so a tall menu
-// scrolls internally instead of ever being cut off by the viewport edge.
-document.body.appendChild(navMenuEl);
-
-function positionNavMenu() {
-  const rect = navMenuBtn.getBoundingClientRect();
-  const menuWidth = navMenuEl.offsetWidth || 320;
-  const left = Math.max(8, Math.min(rect.left, window.innerWidth - menuWidth - 8));
-  const top = Math.min(rect.bottom + 8, window.innerHeight - 8);
-  navMenuEl.style.left = `${left}px`;
-  navMenuEl.style.top = `${top}px`;
-}
-
-function openNavMenu() {
-  positionNavMenu();
-  navMenuEl.classList.remove('hidden');
-  navMenuScrimEl.classList.remove('hidden');
-  navMenuBtn.setAttribute('aria-expanded', 'true');
-  enterOverlay();
-}
-
-function hideNavMenuInternal() {
-  navMenuEl.classList.add('hidden');
-  navMenuScrimEl.classList.add('hidden');
-  navMenuBtn.setAttribute('aria-expanded', 'false');
-}
-
-function closeNavMenu() {
-  exitOverlay(hideNavMenuInternal);
-}
-
-navMenuBtn.addEventListener('click', () => {
-  if (navMenuEl.classList.contains('hidden')) openNavMenu();
-  else closeNavMenu();
-});
-
-navMenuScrimEl.addEventListener('click', closeNavMenu);
-
-// The menu is fixed-position (viewport-relative) but the button it hangs
-// off of can move under it (window resize, orientation change) — keep it
-// glued to the button rather than drifting stale while open.
-window.addEventListener('resize', () => {
-  if (!navMenuEl.classList.contains('hidden')) positionNavMenu();
 });
 
 // --- Tabs / search / scan --------------------------------------------------
@@ -3295,7 +3229,6 @@ document.querySelectorAll('.tab-btn[data-tab]').forEach((btn) => {
     btn.classList.add('active');
     state.tab = btn.dataset.tab;
     render();
-    closeNavMenu();
   });
 });
 
