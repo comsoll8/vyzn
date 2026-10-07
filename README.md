@@ -260,7 +260,8 @@ for "am I up to date."
   sign-in").
 - **v0.5.0** — Tautulli-style admin dashboard (live activity,
   play log, stats charts, user management) and 25 built-in profile pictures.
-- **v0.5.1** (current) — hamburger menu replaced by pill tabs in the top bar (matching the
+- **v0.5.2** (current) — DVD/Blu-ray extras (bonus content, deleted scenes, alternate endings, trailers) are no longer indexed as extra copies of a movie, and ones already indexed are removed on the next scan.
+- **v0.5.1** — hamburger menu replaced by pill tabs in the top bar (matching the
   admin dashboard); Control Center spacing fixed; the genre pill now appears
   only on Movies and TV Shows (where it filters the grid), not Home; the admin dashboard has a "Back to VYZN" button and responds to
   the remote's Back key.
@@ -1081,6 +1082,21 @@ the host automatically, so this should work out of the box on Unraid.
   driver issues.
 
 ## What gets scanned
+
+**Extras / bonus content.** Movie files that are DVD/Blu-ray extras are
+skipped so they don't show up as duplicate "versions" of the movie: anything
+inside a folder named `Extras`, `Featurettes`, `Behind The Scenes`, `Deleted
+Scenes`, `Interviews`, `Scenes`, `Shorts`, `Trailers`, `Other`, `Bonus` or
+`Special Features` (Plex/Jellyfin convention); files named like
+`Movie (2010)-trailer.mkv` (also `-featurette`, `-deleted`, `-behindthescenes`,
+`-interview`, `-scene`, `-short`, `-other`, `-sample`); and files sitting
+next to the main movie whose name contains words like "alternate ending",
+"deleted scenes", "behind the scenes", "making of", "bloopers", "bonus",
+"trailer" or "featurette". TV folders are never filtered. Extras indexed by
+older scans are removed on the next scan. Set `SCAN_SKIP_EXTRAS=false` to turn
+this off. A disc extra with an unhelpful name (e.g. `Title 05.mkv`) can still
+slip through — move it into an `Extras` folder or use Settings > Library >
+Purge matching.
 
 By default, `SCAN_ONLY_DIRS=Movies,TvShows` means only those two
 top-level folders directly under `MEDIA_DIR` (i.e. `/media/Movies` and

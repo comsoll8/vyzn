@@ -24,6 +24,7 @@ const scanEvents = new EventEmitter();
 // A single scan can be watched by more than one open browser tab.
 scanEvents.setMaxListeners(50);
 
+const extras = require('./extras');
 const MEDIA_DIR = process.env.MEDIA_DIR || path.join(__dirname, '..', 'media');
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.mkv', '.avi', '.mov', '.webm', '.m4v']);
 
@@ -624,7 +625,21 @@ async function runScan() {
 
   try {
     scanEvents.emit('progress', { stage: 'walking', message: `Scanning ${scopeDesc}...` });
-    const files = walk(MEDIA_DIR);
+    extras.resetCache();
+    const allFiles = walk(MEDIA_DIR);
+    // DVD/Blu-ray extras (bonus content, deleted scenes, alternate endings,
+    // trailers...) are not separate movies — leave them out of the library.
+    const isExtra = (f) => extras.isExtraFile(f, MEDIA_DIR, VIDEO_EXTENSIONS, mediaTypeFromPath(f) === 'tv');
+    const files = allFiles.filter((f) => !isExtra(f));
+    const skippedExtras = allFiles.length - files.length;
+    if (skippedExtras > 0) console.log(`[scanner] Ignoring ${skippedExtras} extras/bonus-content file(s)`);
+    // Clean out extras indexed by earlier scans (before this filter existed).
+    const stale = db.prepare('SELECT id, file_path FROM media_items').all().filter((r) => isExtra(r.file_path));
+    if (stale.length > 0) {
+      const del = db.prepare('DELETE FROM media_items WHERE id = ?');
+      db.transaction(() => { for (const r of stale) del.run(r.id); })();
+      console.log(`[scanner] Removed ${stale.length} previously indexed extras from the library`);
+    }
     console.log(`[scanner] Found ${files.length} files, probing with concurrency ${PROBE_CONCURRENCY}...`);
 
     let added = 0;
