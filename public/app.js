@@ -2657,7 +2657,13 @@ async function openPlayer(item) {
   // WebView (see vyzn-tv's NativePlayerBridge.kt) — it's simply undefined
   // everywhere else (desktop/mobile browsers), so this is a no-op there
   // and the rest of this function runs as before.
-  if (window.VyznNativePlayer && typeof window.VyznNativePlayer.play === 'function') {
+  // With sign-in on, the native player needs the app build that forwards the
+  // login cookie (it reports that via supportsAuth()). Older builds would
+  // just get 401s ("ERROR_CODE_IO_BAD_HTTP_STATUS"), so they fall back to the
+  // in-page player below until the app is updated.
+  const nativeOk = window.VyznNativePlayer && typeof window.VyznNativePlayer.play === 'function'
+    && (!(window.VyznAuth && window.VyznAuth.authRequired()) || typeof window.VyznNativePlayer.supportsAuth === 'function');
+  if (nativeOk) {
     window.VyznNativePlayer.play(JSON.stringify({
       itemId: item.id,
       title: item.tmdb_matched_title || item.title,

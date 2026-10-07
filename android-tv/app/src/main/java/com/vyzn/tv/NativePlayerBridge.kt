@@ -21,6 +21,12 @@ import org.json.JSONObject
  */
 class NativePlayerBridge(private val context: Context, private val serverBaseUrl: () -> String?) {
 
+    // Lets the web app know this build forwards the login cookie to the native
+    // player (older builds don't, so the web app keeps using its own player
+    // for them while sign-in is on).
+    @JavascriptInterface
+    fun supportsAuth(): Boolean = true
+
     @JavascriptInterface
     fun play(payloadJson: String) {
         try {
