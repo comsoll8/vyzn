@@ -432,6 +432,7 @@ function getSpatialNavRoot() {
   if (!movieDetailEl.classList.contains('hidden')) return movieDetailEl;
   if (!showDetailEl.classList.contains('hidden')) return showDetailEl;
   if (!settingsOverlayEl.classList.contains('hidden')) return settingsOverlayEl;
+  if (!profileGateEl.classList.contains('hidden')) return profileGateEl;
   return appEl;
 }
 
@@ -617,7 +618,7 @@ document.addEventListener('keydown', (e) => {
 
   if (e.key === 'Enter' || e.key === ' ') {
     const active = document.activeElement;
-    if (active && active.matches && active.matches(SPATIAL_NAV_ACTIVATABLE_SELECTOR)) {
+    if (active && active.matches && active.matches(SPATIAL_NAV_ACTIVATABLE_SELECTOR + ', .profile-card, .avatar-choice')) {
       e.preventDefault();
       active.click();
     }
@@ -628,7 +629,9 @@ document.addEventListener('keydown', (e) => {
 
 async function fetchProfiles() {
   const res = await fetch('/api/profiles');
-  return res.json();
+  if (!res.ok) return [];
+  const data = await res.json().catch(() => []);
+  return Array.isArray(data) ? data : [];
 }
 
 async function createProfile(name, isChild, avatar) {
@@ -713,11 +716,9 @@ async function initProfiles() {
     return;
   }
 
-  if (profiles.length === 0) {
-    profileGateEl.classList.remove('hidden');
-  } else {
-    profileGateEl.classList.remove('hidden');
-  }
+  profileGateEl.classList.remove('hidden');
+  const first = profileListEl.querySelector('.profile-card') || newProfileNameEl;
+  if (first) setTimeout(() => first.focus(), 50);
 }
 
 newProfileForm.addEventListener('submit', async (e) => {
