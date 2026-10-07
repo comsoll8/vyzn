@@ -261,7 +261,8 @@ for "am I up to date."
 - **v0.5.0** — Tautulli-style admin dashboard (live activity,
   play log, stats charts, user management) and 25 built-in profile pictures.
 - **v0.5.1** (current) — hamburger menu replaced by pill tabs in the top bar (matching the
-  admin dashboard); Control Center spacing fixed.
+  admin dashboard); Control Center spacing fixed; the genre pill now appears
+  only on Movies and TV Shows (where it filters the grid), not Home.
 
 **Android TV app** (`android-tv/`, [all releases](https://github.com/comsoll8/vyzn/releases)):
 

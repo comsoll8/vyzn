@@ -1103,6 +1103,32 @@ async function genreRowDescriptors(profileId) {
   }));
 }
 
+// Genre filter for the Movies / TV Shows grids. genreFilterIds holds the
+// ids of the movies (or shows) in the chosen genre, from
+// /api/genres/:id/media — null means "no filter".
+let genreFilterId = null;
+let genreFilterIds = null;
+async function setGenreFilter(id) {
+  genreFilterId = id;
+  genreFilterIds = null;
+  if (id != null) await loadGenreFilterIds();
+  render();
+}
+function resetGenreFilter() {
+  genreFilterId = null;
+  genreFilterIds = null;
+  setActiveGenrePill(genrePillsEl.querySelector('.genre-pill'));
+}
+async function loadGenreFilterIds() {
+  if (genreFilterId == null) { genreFilterIds = null; return; }
+  const pid = state.profile ? `?profile_id=${state.profile.id}` : '';
+  const rows = await fetchJson(`/api/genres/${genreFilterId}/media${pid}`);
+  genreFilterIds = {
+    movie: new Set(rows.filter((r) => r.kind === 'movie').map((r) => r.id)),
+    show: new Set(rows.filter((r) => r.kind === 'show').map((r) => r.id)),
+  };
+}
+
 function setActiveGenrePill(activeBtn) {
   genrePillsEl.querySelectorAll('.genre-pill').forEach((b) => b.classList.remove('active'));
   if (activeBtn) activeBtn.classList.add('active');
@@ -1128,11 +1154,12 @@ function renderGenrePills(genres) {
   allBtn.addEventListener('click', () => {
     setActiveGenrePill(allBtn);
     closeGenreFilter();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setGenreFilter(null);
   });
   genrePillsEl.appendChild(allBtn);
 
-  const top = genres.slice().sort((a, b) => b.itemCount - a.itemCount).slice(0, GENRE_SHELF_LIMIT);
+  // Movies/TV pages filter by any genre, so list them all (alphabetical).
+  const top = genres.slice().sort((a, b) => a.name.localeCompare(b.name));
   for (const genre of top) {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -1141,7 +1168,7 @@ function renderGenrePills(genres) {
     btn.addEventListener('click', () => {
       setActiveGenrePill(btn);
       closeGenreFilter();
-      scrollShelfToTop(document.getElementById(`genre-shelf-${genre.id}`));
+      setGenreFilter(genre.id);
     });
     genrePillsEl.appendChild(btn);
   }
@@ -1220,7 +1247,8 @@ async function renderGrid() {
   gridEl.classList.remove('hidden');
 
   const myToken = ++seerrSearchToken;
-  const filtered = state.items.filter((item) => matchesTab(item) && matchesQuery(item));
+  const filtered = state.items.filter((item) => matchesTab(item) && matchesQuery(item)
+    && (!genreFilterIds || !isMovie(item) || genreFilterIds.movie.has(item.id)));
 
   // Extra results from Seerr, deduped against whatever the local library
   // search above already found (by tmdb_id — the same title can otherwise
@@ -1490,9 +1518,10 @@ async function renderTvGrid() {
   state.shows = await fetchJson(url);
 
   const myToken = ++seerrSearchToken;
+  const byGenre = genreFilterIds ? state.shows.filter((s) => genreFilterIds.show.has(s.id)) : state.shows;
   const filtered = state.query
-    ? state.shows.filter((s) => s.title.toLowerCase().includes(state.query.toLowerCase()))
-    : state.shows;
+    ? byGenre.filter((s) => s.title.toLowerCase().includes(state.query.toLowerCase()))
+    : byGenre;
 
   let extra = [];
   if (state.query) {
@@ -2327,7 +2356,7 @@ movieDetailEditMatchSubmitBtn.addEventListener('click', async () => {
 });
 
 function render() {
-  const showGenrePills = state.tab === 'home' && !state.query && state.genres.length > 0;
+  const showGenrePills = (state.tab === 'movies' || state.tab === 'tv') && state.genres.length > 0;
   genreFilterBtn.classList.toggle('hidden', !showGenrePills);
   // The dropdown itself should never stay open across a tab switch/search —
   // only the toggle button's visibility tracks showGenrePills.
@@ -2353,6 +2382,8 @@ async function loadLibrary() {
   state.items = items;
   state.genres = genres;
   state.seerrConfigured = Boolean(settings && settings.seerrConfigured);
+  genreFilterId = null;
+  genreFilterIds = null;
   renderGenrePills(genres);
   render();
 }
@@ -3228,6 +3259,7 @@ document.querySelectorAll('.tab-btn[data-tab]').forEach((btn) => {
     document.querySelectorAll('.tab-btn[data-tab]').forEach((b) => b.classList.remove('active'));
     btn.classList.add('active');
     state.tab = btn.dataset.tab;
+    resetGenreFilter();
     render();
   });
 });
