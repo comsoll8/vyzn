@@ -69,6 +69,17 @@ android-tv/
   gradle.properties
 ```
 
+## Building it without Android Studio (GitHub Actions)
+
+`.github/workflows/android.yml` builds a side-loadable debug APK on GitHub's
+servers. Run it from the repo's **Actions** tab (*Build Android TV app* > Run
+workflow) and download the `vyzn-tv-apk` artifact, or push a tag like
+`tv-v3` to have the APK attached to a GitHub Release automatically.
+Because that APK is signed with GitHub's debug key (not the one on your own
+computer), **uninstall the existing VYZN app from the TV first** — Android
+refuses to update an app signed with a different key — and re-enter the
+server address afterwards.
+
 ## Building it
 
 1. **Install Android Studio** (any recent version — this targets AGP 8.2.2 /
