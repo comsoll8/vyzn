@@ -1715,6 +1715,11 @@ for every `/api/` and `/stream-files/` request, and that account is the
 admin (admins add or remove others). Passwords are stored as scrypt hashes;
 login tokens are stored only as SHA-256 hashes.
 
+- **Separate profiles per account**: each login has its own "Who's
+  watching?" profiles (and so its own history, watchlist and parental
+  limits); one account can't see or touch another's. The media library
+  itself is shared. Profiles that existed before accounts were turned on
+  are claimed by the first account.
 - **Login screen**: username + password with "Remember This Device"
   (token kept in `localStorage` as `vyzn_auth_token`, validated on start via
   `GET /api/auth/verify`). **Sign Out** is in the Control Center.

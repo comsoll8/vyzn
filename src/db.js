@@ -229,6 +229,13 @@ const detailCacheColumns = new Set(db.prepare(`PRAGMA table_info(tmdb_detail_cac
 if (!detailCacheColumns.has('similar_source')) {
   db.exec(`ALTER TABLE tmdb_detail_cache ADD COLUMN similar_source TEXT`);
 }
+// Profiles belong to an account (src/auth.js): each login sees only its own
+// "Who's watching?" list. NULL = created before accounts existed; the first
+// account created claims all of those.
+const profileColumns = new Set(db.prepare(`PRAGMA table_info(profiles)`).all().map((c) => c.name));
+if (!profileColumns.has('user_id')) {
+  db.exec(`ALTER TABLE profiles ADD COLUMN user_id INTEGER`);
+}
 // Added for the post-playback recommendation screen's franchise-first
 // ordering (direct sequels/prequels before generic "similar" picks) — a
 // movie's TMDB collection (belongs_to_collection -> /collection/{id})

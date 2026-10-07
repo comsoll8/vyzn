@@ -833,7 +833,8 @@ async function main() {
 
   // --- Profiles ----------------------------------------------------------
 
-  fastify.get('/api/profiles', async () => {
+  fastify.get('/api/profiles', async (request) => {
+    if (auth.hasUsers()) return auth.listProfiles(request.user.id);
     return db.prepare('SELECT * FROM profiles ORDER BY id').all();
   });
 
@@ -844,8 +845,8 @@ async function main() {
       return { error: 'Provide {"name": "..."}' };
     }
     const result = db
-      .prepare('INSERT INTO profiles (name, avatar, is_child, max_content_rating) VALUES (?, ?, ?, ?)')
-      .run(name, avatar || null, isChild ? 1 : 0, maxRating || null);
+      .prepare('INSERT INTO profiles (name, avatar, is_child, max_content_rating, user_id) VALUES (?, ?, ?, ?, ?)')
+      .run(name, avatar || null, isChild ? 1 : 0, maxRating || null, request.user ? request.user.id : null);
     return db.prepare('SELECT * FROM profiles WHERE id = ?').get(result.lastInsertRowid);
   });
 

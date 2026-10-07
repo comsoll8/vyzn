@@ -162,6 +162,7 @@
   async function signOut() {
     try { await nativeFetch('/api/auth/logout', { method: 'POST', headers: getToken() ? { Authorization: 'Bearer ' + getToken() } : {} }); } catch {}
     clearToken();
+    try { localStorage.removeItem('media-server:profileId'); } catch {}
     location.reload();
   }
   $('ccSignOutBtn').addEventListener('click', signOut);

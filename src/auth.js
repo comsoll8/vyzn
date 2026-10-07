@@ -137,8 +137,19 @@ function requestOrigin(req) {
   return `${proto}://${req.headers.host}`;
 }
 
-function listProfiles() {
-  try { return db.prepare('SELECT * FROM profiles ORDER BY id').all(); } catch { return []; }
+// Each account only sees its own profiles.
+function listProfiles(userId) {
+  try { return db.prepare('SELECT * FROM profiles WHERE user_id = ? ORDER BY id').all(userId); } catch { return []; }
+}
+
+// Profile ids a request refers to via /api/profiles/:id/... or ?profile_id=.
+function profileIdsIn(url) {
+  const ids = [];
+  const m = url.split('?')[0].match(/^\/api\/profiles\/(\d+)/);
+  if (m) ids.push(Number(m[1]));
+  const q = url.split('?')[1];
+  if (q) { const v = new URLSearchParams(q).get('profile_id'); if (v && /^\d+$/.test(v)) ids.push(Number(v)); }
+  return ids;
 }
 
 // ---- enforcement hook -------------------------------------------------
@@ -160,8 +171,14 @@ function authHook(req, reply, done) {
   req.user = null;
   const tok = tokenFromRequest(req);
   if (tok) req.user = userForToken(tok);
-  if (!hasUsers() || isPublic(p) || req.user) return done();
-  reply.code(401).send({ error: 'auth_required' });
+  if (!hasUsers() || isPublic(p)) return done();
+  if (!req.user) return reply.code(401).send({ error: 'auth_required' });
+  // Accounts are separate instances: a login may only touch its own profiles.
+  for (const pid of profileIdsIn(req.raw.url)) {
+    const row = db.prepare('SELECT user_id FROM profiles WHERE id = ?').get(pid);
+    if (row && row.user_id !== req.user.id) return reply.code(403).send({ error: 'not_your_profile' });
+  }
+  done();
 }
 
 // ---- routes -----------------------------------------------------------
@@ -193,7 +210,7 @@ function register(fastify) {
     if (r.error) return reply.code(r.error === 'rate_limited' ? 429 : 401).send({ error: r.error });
     const { token, maxAgeMs } = issueToken(r.user.id, !!remember, 'login');
     setCookie(reply, token, maxAgeMs);
-    return { token, user: publicUser(r.user), profiles: listProfiles() };
+    return { token, user: publicUser(r.user), profiles: listProfiles(r.user.id) };
   });
 
   fastify.get('/api/auth/verify', async (req, reply) => {
@@ -205,7 +222,7 @@ function register(fastify) {
     const remaining = row ? row.expires_at - Date.now() : null;
     setCookie(reply, tok, remaining && remaining > TTL_SESSION ? remaining : null);
     db.prepare('UPDATE auth_tokens SET last_used_at = ? WHERE token_hash = ?').run(Date.now(), sha(tok));
-    return { user: publicUser(req.user), profiles: listProfiles() };
+    return { user: publicUser(req.user), profiles: listProfiles(req.user.id) };
   });
 
   fastify.post('/api/auth/logout', async (req, reply) => {
@@ -230,9 +247,10 @@ function register(fastify) {
     invalidateUsers();
     const u = db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid);
     if (first) {
+      db.prepare('UPDATE profiles SET user_id = ? WHERE user_id IS NULL').run(u.id);
       const { token, maxAgeMs } = issueToken(u.id, true, 'first-account');
       setCookie(reply, token, maxAgeMs);
-      return { token, user: publicUser(u), profiles: listProfiles() };
+      return { token, user: publicUser(u), profiles: listProfiles(u.id) };
     }
     return { user: publicUser(u) };
   });
@@ -247,6 +265,7 @@ function register(fastify) {
     if (!requireAdmin(req, reply)) return;
     const id = Number(req.params.id);
     if (id === req.user.id) return reply.code(400).send({ error: "You can't delete your own account." });
+    db.prepare('DELETE FROM profiles WHERE user_id = ?').run(id);
     db.prepare('DELETE FROM users WHERE id = ?').run(id);
     invalidateUsers();
     return { ok: true };
@@ -298,7 +317,7 @@ function register(fastify) {
     const u = db.prepare('SELECT * FROM users WHERE id = ?').get(s.userId);
     if (!u) return { status: 'expired' };
     setCookie(reply, s.token, s.maxAgeMs);
-    return { status: 'approved', token: s.token, user: publicUser(u), profiles: listProfiles() };
+    return { status: 'approved', token: s.token, user: publicUser(u), profiles: listProfiles(u.id) };
   });
 
   // Phone side. Either already signed in (Bearer/cookie) or supplies
@@ -335,4 +354,4 @@ function register(fastify) {
   });
 }
 
-module.exports = { register, hashPassword, verifyPassword, issueToken, userForToken, hasUsers, authHook, invalidateUsers };
+module.exports = { listProfiles, register, hashPassword, verifyPassword, issueToken, userForToken, hasUsers, authHook, invalidateUsers };
