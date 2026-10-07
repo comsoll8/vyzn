@@ -171,6 +171,7 @@
 
   async function syncAccountUi() {
     $('ccSignOutBtn').classList.toggle('hidden', !(state.authRequired && state.user));
+    syncAdminPanel();
     const isAdmin = !state.authRequired || (state.user && state.user.isAdmin);
     $('accountsSection').classList.toggle('hidden', !isAdmin && !state.user);
     $('accountForm').classList.toggle('hidden', !isAdmin);
@@ -201,6 +202,105 @@
         list.appendChild(row);
       }
     } catch {}
+  }
+
+
+  // --- admin panel (accounts overview + watch history) -----------------------
+  let histOffset = 0;
+  const when = (s) => { if (!s) return '—'; const d = new Date(String(s).replace(' ', 'T') + 'Z'); return isNaN(d) ? s : d.toLocaleString(); };
+  const ago = (ms) => (ms ? new Date(ms).toLocaleString() : 'never');
+
+  async function adminPost(url, body) {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) { toast(d.error || 'Failed'); return null; }
+    return d;
+  }
+
+  async function loadAdminUsers() {
+    const box = $('adminUsers');
+    const res = await fetch('/api/admin/overview');
+    if (!res.ok) return;
+    const users = await res.json();
+    box.innerHTML = '';
+    const sel = $('adminHistFilter');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">All accounts &amp; profiles</option>';
+    for (const u of users) {
+      const o = document.createElement('option');
+      o.value = 'u' + u.id; o.textContent = u.displayName + ' (all profiles)'; sel.appendChild(o);
+      for (const p of u.profiles) {
+        const po = document.createElement('option');
+        po.value = 'p' + p.id; po.textContent = '   ' + u.displayName + ' › ' + p.name; sel.appendChild(po);
+      }
+      const card = document.createElement('div');
+      card.className = 'admin-user';
+      card.innerHTML = '<div class="admin-user-head"><strong>' + esc(u.displayName) + '</strong> <small>@' + esc(u.username) + (u.isAdmin ? ' · admin' : '') +
+        ' · ' + u.devices + ' signed-in device' + (u.devices === 1 ? '' : 's') + ' · last active ' + esc(ago(u.lastActive)) + '</small></div>';
+      const actions = document.createElement('div');
+      actions.className = 'admin-actions';
+      const mk = (label, fn) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn-secondary'; b.textContent = label; b.addEventListener('click', fn); actions.appendChild(b); };
+      mk('Reset password', async () => {
+        const pw = prompt('New password for ' + u.username + ' (6+ characters). This also signs them out everywhere.');
+        if (pw && await adminPost('/api/admin/users/' + u.id + '/reset', { password: pw })) { toast('Password reset.'); loadAdminUsers(); }
+      });
+      mk('Clear all history', async () => {
+        if (confirm('Clear watch history and watchlists for every profile of ' + u.username + '?')) {
+          const r = await adminPost('/api/admin/users/' + u.id + '/reset-history');
+          if (r) { toast('Cleared ' + r.historyCleared + ' entries.'); loadAdminUsers(); loadHistory(true); }
+        }
+      });
+      card.appendChild(actions);
+      const plist = document.createElement('div');
+      plist.className = 'admin-profiles';
+      for (const p of u.profiles) {
+        const row = document.createElement('div');
+        row.className = 'accounts-row';
+        row.innerHTML = '<span>' + esc(p.name) + (p.is_child ? ' <small>kids</small>' : '') + ' <small>' + p.titles_watched + ' titles · last ' + esc(when(p.last_watched_at)) + '</small></span>';
+        const b1 = document.createElement('button'); b1.type = 'button'; b1.className = 'btn-secondary'; b1.textContent = 'Clear history';
+        b1.addEventListener('click', async () => {
+          if (confirm('Clear history and watchlist for profile "' + p.name + '"?') && await adminPost('/api/admin/profiles/' + p.id + '/reset')) { toast('Profile reset.'); loadAdminUsers(); loadHistory(true); }
+        });
+        const b2 = document.createElement('button'); b2.type = 'button'; b2.className = 'btn-secondary'; b2.textContent = 'Delete';
+        b2.addEventListener('click', async () => {
+          if (!confirm('Delete profile "' + p.name + '" and all its history?')) return;
+          await fetch('/api/profiles/' + p.id, { method: 'DELETE' }); loadAdminUsers(); loadHistory(true);
+        });
+        row.append(b1, b2); plist.appendChild(row);
+      }
+      card.appendChild(plist);
+      box.appendChild(card);
+    }
+    sel.value = cur;
+  }
+
+  async function loadHistory(reset) {
+    if (reset) { histOffset = 0; $('adminHistory').innerHTML = ''; }
+    const v = $('adminHistFilter').value;
+    const qs = new URLSearchParams({ limit: 50, offset: histOffset });
+    if (v[0] === 'u') qs.set('user', v.slice(1)); else if (v[0] === 'p') qs.set('profile', v.slice(1));
+    const res = await fetch('/api/admin/history?' + qs);
+    if (!res.ok) return;
+    const rows = await res.json();
+    for (const r of rows) {
+      const el = document.createElement('div');
+      el.className = 'admin-hist-row';
+      el.innerHTML = '<div><strong>' + esc(r.title) + '</strong><br><small>' + esc(r.user || 'unassigned') + ' › ' + esc(r.profile) + ' · ' + esc(when(r.lastWatchedAt)) + '</small></div>' +
+        '<div class="admin-pct">' + (r.completed ? 'Finished' : r.percent + '%') + '</div>';
+      $('adminHistory').appendChild(el);
+    }
+    histOffset += rows.length;
+    $('adminHistMore').classList.toggle('hidden', rows.length < 50);
+    if (reset && !rows.length) $('adminHistory').innerHTML = '<p class="settings-hint">No watch history yet.</p>';
+  }
+  $('adminHistFilter').addEventListener('change', () => loadHistory(true));
+  $('adminHistRefresh').addEventListener('click', () => { loadAdminUsers(); loadHistory(true); });
+  $('adminHistMore').addEventListener('click', () => loadHistory(false));
+
+  function syncAdminPanel() {
+    const show = state.authRequired && state.user && state.user.isAdmin;
+    $('adminSection').classList.toggle('hidden', !show);
+    if (show) { loadAdminUsers(); loadHistory(true); }
   }
 
   $('accountForm').addEventListener('submit', async (e) => {

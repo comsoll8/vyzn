@@ -1720,6 +1720,13 @@ login tokens are stored only as SHA-256 hashes.
   limits); one account can't see or touch another's. The media library
   itself is shared. Profiles that existed before accounts were turned on
   are claimed by the first account.
+- **Admin panel** (Settings > Admin, admins only, Tautulli-style): see every
+  account with its profiles and signed-in devices, reset a password (also
+  signs that account out everywhere), clear a profile's or a whole
+  account's watch history and watchlist, delete profiles, and browse watch
+  history across all accounts and profiles with a filter. History shows the
+  latest state per title (not a full play-by-play log). Admins can also
+  access any profile's data; other accounts can't.
 - **Login screen**: username + password with "Remember This Device"
   (token kept in `localStorage` as `vyzn_auth_token`, validated on start via
   `GET /api/auth/verify`). **Sign Out** is in the Control Center.

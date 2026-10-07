@@ -340,6 +340,18 @@
         </form>
       </section>
 
+      <section class="settings-section hidden" id="adminSection">
+        <h3>Admin: accounts &amp; watch history</h3>
+        <p class="settings-hint">Reset passwords, clear a profile's history, and see what everyone has watched (latest state per title).</p>
+        <div id="adminUsers" class="admin-users"></div>
+        <div class="admin-history-head">
+          <select id="adminHistFilter"><option value="">All accounts &amp; profiles</option></select>
+          <button type="button" id="adminHistRefresh" class="btn-secondary">Refresh</button>
+        </div>
+        <div id="adminHistory" class="admin-history"></div>
+        <button type="button" id="adminHistMore" class="btn-secondary hidden">Load more</button>
+      </section>
+
       <!-- Required by TMDB's API Terms of Use: a visible attribution notice
            in an About/Credits section, linking to themoviedb.org, referring
            to them only as "TMDB" or "The Movie Database". See

@@ -174,6 +174,7 @@ function authHook(req, reply, done) {
   if (!hasUsers() || isPublic(p)) return done();
   if (!req.user) return reply.code(401).send({ error: 'auth_required' });
   // Accounts are separate instances: a login may only touch its own profiles.
+  if (req.user.is_admin) return done();
   for (const pid of profileIdsIn(req.raw.url)) {
     const row = db.prepare('SELECT user_id FROM profiles WHERE id = ?').get(pid);
     if (row && row.user_id !== req.user.id) return reply.code(403).send({ error: 'not_your_profile' });
@@ -345,6 +346,93 @@ function register(fastify) {
       setCookie(reply, t.token, t.maxAgeMs);
     }
     return { ok: true, user: publicUser(user), phoneToken };
+  });
+
+  // --- Admin: overview, watch history, resets (Tautulli-style) -------------
+  fastify.get('/api/admin/overview', async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+    const users = db.prepare('SELECT id, username, display_name, is_admin, created_at FROM users ORDER BY id').all();
+    const profiles = db.prepare(`
+      SELECT p.id, p.name, p.user_id, p.is_child,
+             (SELECT COUNT(*) FROM playback_progress WHERE profile_id = p.id) AS titles_watched,
+             (SELECT MAX(last_watched_at) FROM playback_progress WHERE profile_id = p.id) AS last_watched_at
+      FROM profiles p ORDER BY p.id`).all();
+    const sessions = db.prepare('SELECT user_id, COUNT(*) AS n, MAX(last_used_at) AS last_used FROM auth_tokens WHERE expires_at > ? GROUP BY user_id').all(Date.now());
+    return users.map((u) => {
+      const s = sessions.find((x) => x.user_id === u.id);
+      return { ...publicUser(u), createdAt: u.created_at, devices: s ? s.n : 0, lastActive: s ? s.last_used : null,
+               profiles: profiles.filter((p) => p.user_id === u.id) };
+    });
+  });
+
+  // One row per (profile, title): the latest position/time. VYZN stores the
+  // last state per title, not a full play-by-play log.
+  fastify.get('/api/admin/history', async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+    const q = req.query || {};
+    const limit = Math.min(Math.max(parseInt(q.limit, 10) || 50, 1), 200);
+    const offset = Math.max(parseInt(q.offset, 10) || 0, 0);
+    const where = []; const args = {};
+    if (/^\d+$/.test(q.user || '')) { where.push('p.user_id = @user'); args.user = Number(q.user); }
+    if (/^\d+$/.test(q.profile || '')) { where.push('pp.profile_id = @profile'); args.profile = Number(q.profile); }
+    const rows = db.prepare(`
+      SELECT pp.profile_id, p.name AS profile_name, u.id AS user_id, u.username, COALESCE(u.display_name, u.username) AS user_display,
+             m.id AS media_id, m.title AS media_title, m.poster_url,
+             s.title AS show_title, se.season_number, e.episode_number, e.title AS episode_title,
+             pp.position_seconds, pp.duration_seconds, pp.completed, pp.last_watched_at
+      FROM playback_progress pp
+      JOIN profiles p ON p.id = pp.profile_id
+      LEFT JOIN users u ON u.id = p.user_id
+      JOIN media_items m ON m.id = pp.media_id
+      LEFT JOIN tv_episodes e ON e.media_item_id = m.id
+      LEFT JOIN tv_seasons se ON se.id = e.season_id
+      LEFT JOIN tv_shows s ON s.id = e.show_id
+      ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+      ORDER BY pp.last_watched_at DESC LIMIT @limit OFFSET @offset`).all({ ...args, limit, offset });
+    return rows.map((r) => ({
+      user: r.user_display, username: r.username, profile: r.profile_name, profileId: r.profile_id,
+      title: r.show_title
+        ? `${r.show_title} · S${String(r.season_number).padStart(2, '0')}E${String(r.episode_number).padStart(2, '0')}${r.episode_title ? ' · ' + r.episode_title : ''}`
+        : r.media_title,
+      percent: r.duration_seconds > 0 ? Math.min(100, Math.round((r.position_seconds / r.duration_seconds) * 100)) : 0,
+      completed: !!r.completed, lastWatchedAt: r.last_watched_at,
+    }));
+  });
+
+  // Reset an account: new password + sign out every device.
+  fastify.post('/api/admin/users/:id/reset', async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+    const id = Number(req.params.id);
+    const { password } = req.body || {};
+    if (!db.prepare('SELECT 1 FROM users WHERE id = ?').get(id)) return reply.code(404).send({ error: 'No such account.' });
+    if (typeof password !== 'string' || password.length < 6) return reply.code(400).send({ error: 'Password must be at least 6 characters.' });
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(password), id);
+    const keep = id === req.user.id ? sha(tokenFromRequest(req) || '') : '';
+    db.prepare('DELETE FROM auth_tokens WHERE user_id = ? AND token_hash != ?').run(id, keep);
+    return { ok: true };
+  });
+
+  // Reset a profile: wipe its watch history, progress and watchlist (keeps the profile).
+  fastify.post('/api/admin/profiles/:id/reset', async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+    const id = Number(req.params.id);
+    if (!db.prepare('SELECT 1 FROM profiles WHERE id = ?').get(id)) return reply.code(404).send({ error: 'No such profile.' });
+    const a = db.prepare('DELETE FROM playback_progress WHERE profile_id = ?').run(id).changes;
+    const b = db.prepare('DELETE FROM watchlist WHERE profile_id = ?').run(id).changes;
+    return { ok: true, historyCleared: a, watchlistCleared: b };
+  });
+
+  // Reset a whole account's profiles' history in one go.
+  fastify.post('/api/admin/users/:id/reset-history', async (req, reply) => {
+    if (!requireAdmin(req, reply)) return;
+    const id = Number(req.params.id);
+    const ids = db.prepare('SELECT id FROM profiles WHERE user_id = ?').all(id).map((r) => r.id);
+    let n = 0;
+    for (const pid of ids) {
+      n += db.prepare('DELETE FROM playback_progress WHERE profile_id = ?').run(pid).changes;
+      db.prepare('DELETE FROM watchlist WHERE profile_id = ?').run(pid);
+    }
+    return { ok: true, historyCleared: n };
   });
 
   // Mobile pairing page.

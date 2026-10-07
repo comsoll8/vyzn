@@ -2613,3 +2613,15 @@ select:focus-visible,
 .accounts-row small { opacity: .6; }
 .accounts-form { display: flex; flex-direction: column; gap: 8px; max-width: 360px; }
 .accounts-form input { padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.2); background: rgba(0,0,0,.35); color: inherit; }
+
+/* Admin panel */
+.admin-user { padding: 12px; margin: 10px 0; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: rgba(255,255,255,.04); }
+.admin-user-head small { opacity: .65; }
+.admin-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.admin-profiles { display: flex; flex-direction: column; gap: 6px; }
+.admin-profiles .accounts-row small, .admin-hist-row small { opacity: .65; }
+.admin-history-head { display: flex; gap: 8px; margin: 16px 0 8px; }
+.admin-history-head select { flex: 1; padding: 10px; border-radius: 8px; background: rgba(0,0,0,.4); color: inherit; border: 1px solid rgba(255,255,255,.2); }
+.admin-history { max-height: 360px; overflow-y: auto; }
+.admin-hist-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+.admin-pct { white-space: nowrap; opacity: .85; }
