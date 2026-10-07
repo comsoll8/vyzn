@@ -3859,13 +3859,25 @@ function openSettings() {
   settingsScanInfoEl.textContent = '';
   configSaveStatusEl.textContent = '';
   settingsAudioPrefSelectEl.value = localStorage.getItem(AUDIO_PREF_KEY) || '';
-  loadSettingsSystemInfo();
   loadSettingsProfiles();
+  loadAdminSettingsData();
+  enterOverlay();
+}
+
+// Server-level sections (library, unmatched, system info, connections,
+// Tailscale, accounts) — they live in the admin dashboard's Server Settings
+// tab for admins (see admin.js), or in the Settings overlay while sign-in
+// is off. Either way these loaders fill them.
+function loadAdminSettingsData() {
+  settingsScanInfoEl.textContent = '';
+  configSaveStatusEl.textContent = '';
+  loadSettingsSystemInfo();
   loadUnmatchedList();
   loadConfigForm();
   loadTailscaleStatus();
-  enterOverlay();
+  if (window.VyznAuth) window.VyznAuth.refreshAccounts();
 }
+window.loadAdminSettingsData = loadAdminSettingsData;
 
 settingsAudioPrefSelectEl.addEventListener('change', () => {
   localStorage.setItem(AUDIO_PREF_KEY, settingsAudioPrefSelectEl.value);
@@ -3893,14 +3905,18 @@ function hideUnmatchedInternal() {
   unmatchedOverlayEl.classList.add('hidden');
 }
 
+let unmatchedFromAdmin = false;
 function openUnmatched() {
+  const adminEl = document.getElementById('adminOverlay');
+  unmatchedFromAdmin = !!(adminEl && !adminEl.classList.contains('hidden'));
   settingsOverlayEl.classList.add('hidden');
   unmatchedOverlayEl.classList.remove('hidden');
 }
 
 function closeUnmatched() {
   hideUnmatchedInternal();
-  settingsOverlayEl.classList.remove('hidden');
+  if (!unmatchedFromAdmin) settingsOverlayEl.classList.remove('hidden');
+  unmatchedFromAdmin = false;
   if (window.VyznAuth) window.VyznAuth.refreshAccounts();
 }
 

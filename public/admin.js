@@ -183,8 +183,17 @@
   }
 
   // ---- shell -----------------------------------------------------------------
+  const pane = $('adminSettingsPane');
   function show(t) {
     tab = t;
+    body.classList.toggle('hidden', t === 'settings');
+    pane.classList.toggle('hidden', t !== 'settings');
+    if (t === 'settings') {
+      clearInterval(liveTimer); liveTimer = null;
+      document.querySelectorAll('#adminTabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === t));
+      if (typeof window.loadAdminSettingsData === 'function') window.loadAdminSettingsData();
+      return;
+    }
     clearInterval(liveTimer); liveTimer = null;
     document.querySelectorAll('#adminTabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === t));
     body.innerHTML = '<div class="adm-empty"><img src="/assets/vyzn-mark-scanning.svg" alt="" /></div>';
@@ -204,5 +213,21 @@
   $('adminBack').addEventListener('click', close);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !overlay.classList.contains('hidden')) { e.stopPropagation(); close(); } }, true);
   $('ccAdminBtn').addEventListener('click', () => { if (typeof hideControlCenterInternal === 'function') hideControlCenterInternal(); open(); });
-  document.addEventListener('vyzn-auth-changed', () => $('ccAdminBtn').classList.toggle('hidden', !(window.VyznAuth && window.VyznAuth.isAdmin())));
+  // Server-level settings sections: admins get them in the dashboard's Server
+  // Settings tab, other signed-in accounts don't get them at all, and while
+  // sign-in is off they stay in the regular Settings overlay as before.
+  document.addEventListener('vyzn-auth-changed', () => {
+    const A = window.VyznAuth;
+    const admin = !!(A && A.isAdmin());
+    const locked = !!(A && A.authRequired());
+    $('ccAdminBtn').classList.toggle('hidden', !admin);
+    const sections = document.querySelectorAll('[data-admin-only]');
+    if (admin) {
+      if (!pane.querySelector('h2')) pane.innerHTML = '<h2 class="admin-pane-title">Server settings</h2>';
+      sections.forEach((s) => { s.classList.remove('hidden'); if (s.parentElement !== pane) pane.appendChild(s); });
+    } else {
+      sections.forEach((s) => s.classList.toggle('hidden', locked));
+    }
+    for (const id of ['ccRescanBtn', 'ccSystemInfoBtn']) $(id).classList.toggle('hidden', locked && !admin);
+  });
 })();

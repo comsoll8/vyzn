@@ -2709,3 +2709,8 @@ select:focus-visible,
 .admin-back:hover { background: rgba(255,255,255,.14); }
 .admin-back:focus-visible { outline: none; border-color: #00e5ff; }
 .admin-tabs { margin-left: 4px; }
+
+#unmatchedOverlay { z-index: 2600; }
+.admin-pane-title { margin: 0 0 8px; font-size: 1.2rem; }
+.admin-settings-pane { max-width: 760px; }
+.admin-settings-pane .settings-section:first-of-type { border-top: 1px solid rgba(255,255,255,.08); padding-top: 18px; margin-top: 18px; }

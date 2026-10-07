@@ -83,9 +83,11 @@
         <button type="button" data-tab="history">History</button>
         <button type="button" data-tab="stats">Stats</button>
         <button type="button" data-tab="users">Users</button>
+        <button type="button" data-tab="settings">Server Settings</button>
       </nav>
     </header>
     <main id="adminBody" class="admin-body"></main>
+    <div id="adminSettingsPane" class="admin-body admin-settings-pane hidden"></div>
   </div>
 
   <div id="vyznToast" class="vyzn-toast" role="status" aria-live="polite"></div>
@@ -226,7 +228,7 @@
       <button id="closeSettings" class="close-btn" aria-label="Close">&times;</button>
       <h2>Settings</h2>
 
-      <section class="settings-section">
+      <section class="settings-section" data-admin-only>
         <h3>Library</h3>
         <div class="settings-actions">
           <button id="settingsScanBtn" class="btn-secondary">Scan Library</button>
@@ -258,7 +260,7 @@
         </div>
       </section>
 
-      <section class="settings-section">
+      <section class="settings-section" data-admin-only>
         <h3>Unmatched items</h3>
         <p class="settings-hint">Items with no TMDB match yet. Moved to its own page since the list can get long.</p>
         <button id="openUnmatchedBtn" class="btn-secondary">
@@ -294,7 +296,7 @@
         <p class="settings-hint">Used to auto-pick a track when a title has more than one audio language available — you can always override it per-title from the player's audio track button.</p>
       </section>
 
-      <section class="settings-section">
+      <section class="settings-section" data-admin-only>
         <h3>System info</h3>
         <dl id="settingsSystemInfo" class="settings-system-info"></dl>
         <!-- A plain download link, not a fetch()+blob button — this works
@@ -312,7 +314,7 @@
            own DB via PUT /api/settings/config, no docker-compose.yml edit
            or restart needed. This is what makes a fresh install
            self-configurable entirely through the UI. -->
-      <section class="settings-section">
+      <section class="settings-section" data-admin-only>
         <h3>Connections</h3>
         <p class="settings-hint">These override whatever's set in docker-compose.yml, and take effect immediately — no restart needed. A friend setting up their own VYZN can leave docker-compose.yml untouched and configure everything from here.</p>
         <form id="configForm" class="config-form"></form>
@@ -325,7 +327,7 @@
       <!-- Tailscale: remote access without port-forwarding. Status is
            polled on open; Connect shells out to `tailscale up` inside the
            container (src/tailscale.js). -->
-      <section class="settings-section">
+      <section class="settings-section" data-admin-only>
         <h3>Remote Access (Tailscale)</h3>
         <p class="settings-hint">Installs VYZN onto your private Tailscale network so you can reach it from outside your home, with no port-forwarding. Get an auth key from the <a href="https://login.tailscale.com/admin/settings/keys" target="_blank" rel="noopener">Tailscale admin console</a>, paste it below, and connect.</p>
         <div id="tailscaleStatus" class="settings-info"></div>
@@ -338,7 +340,7 @@
         </div>
       </section>
 
-      <section class="settings-section" id="accountsSection">
+      <section class="settings-section" id="accountsSection" data-admin-only>
         <h3>Accounts</h3>
         <p id="accountsIntro" class="settings-hint"></p>
         <div id="accountsList" class="accounts-list"></div>

@@ -173,7 +173,7 @@
     $('ccSignOutBtn').classList.toggle('hidden', !(state.authRequired && state.user));
     document.dispatchEvent(new CustomEvent('vyzn-auth-changed'));
     const isAdmin = !state.authRequired || (state.user && state.user.isAdmin);
-    $('accountsSection').classList.toggle('hidden', !isAdmin && !state.user);
+    $('accountsSection').classList.toggle('hidden', !isAdmin);
     $('accountForm').classList.toggle('hidden', !isAdmin);
     $('accountsIntro').textContent = state.authRequired
       ? 'Anyone who wants to use this server needs one of these accounts.'
@@ -244,6 +244,7 @@
   })();
 
   window.VyznAuth = { ready, toast, signOut, getToken, refreshAccounts: syncAccountUi, esc,
+    authRequired: () => state.authRequired,
     isAdmin: () => !!(state.authRequired && state.user && state.user.isAdmin) };
   syncAccountUi();
 })();

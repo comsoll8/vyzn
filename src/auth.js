@@ -167,6 +167,19 @@ function isPublic(p) {
   return !(p.startsWith('/api/') || p.startsWith('/stream-files/'));
 }
 
+// Server-level actions only admins may perform once accounts exist.
+const ADMIN_ONLY = [
+  ['GET', /^\/api\/settings\/config$/], ['PUT', /^\/api\/settings\/config$/],
+  ['*', /^\/api\/tailscale\//],
+  ['POST', /^\/api\/scan$/],
+  ['POST', /^\/api\/library\/(purge|retry-unmatched|backfill-genres)$/],
+  ['DELETE', /^\/api\/library$/], ['POST', /^\/api\/library\/\d+\/rematch$/],
+  ['GET', /^\/api\/library\/unmatched$/],
+  ['GET', /^\/api\/logs\/download$/],
+  ['POST', /^\/api\/streams\/[^/]+\/stop$/],
+];
+const isAdminOnly = (method, p) => ADMIN_ONLY.some(([m, re]) => (m === '*' || m === method) && re.test(p));
+
 function authHook(req, reply, done) {
   const p = req.raw.url.split('?')[0];
   req.user = null;
@@ -176,6 +189,7 @@ function authHook(req, reply, done) {
   if (!req.user) return reply.code(401).send({ error: 'auth_required' });
   // Accounts are separate instances: a login may only touch its own profiles.
   if (req.user.is_admin) return done();
+  if (isAdminOnly(req.method, p)) return reply.code(403).send({ error: 'admin_required' });
   for (const pid of profileIdsIn(req.raw.url)) {
     const row = db.prepare('SELECT user_id FROM profiles WHERE id = ?').get(pid);
     if (row && row.user_id !== req.user.id) return reply.code(403).send({ error: 'not_your_profile' });
