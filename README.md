@@ -161,6 +161,17 @@ This is what makes a from-scratch install self-configurable: a fresh
 whoever's running the server just fills them in from the Settings page
 after first launch.
 
+## Public access with Tailscale Funnel (for devices that can't run Tailscale)
+
+Devices like an Xbox can't join a tailnet, but Edge can open a public HTTPS address. Tailscale Funnel publishes VYZN at `https://<hostname>.<tailnet>.ts.net` with no router changes or extra software:
+
+1. In the Tailscale admin console, enable **HTTPS Certificates** (DNS page) and allow Funnel for the node (Access controls → the `funnel` node attribute; new tailnets usually have it by default).
+2. Make sure an account exists first (VYZN is open until the first account is created, so never publish it before then).
+3. Run, on the Unraid host: `docker exec vyzn tailscale funnel --bg 8080`
+4. Check with `docker exec vyzn tailscale funnel status`; stop with `docker exec vyzn tailscale funnel --bg 8080 off`.
+
+Over HTTPS the sign-in cookie is marked `Secure`, and logins are rate-limited per client and per account.
+
 ## Remote access via Tailscale
 
 A Tailscale client (`tailscaled` + the `tailscale` CLI) runs inside the
