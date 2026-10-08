@@ -37,10 +37,6 @@ try {
 }
 
 const fastify = require('fastify')({
-  // Tailscale Funnel (and any local reverse proxy) connects from loopback and
-  // reports the real client in X-Forwarded-*; trust only loopback so req.ip,
-  // the login rate limiter and the Secure-cookie check see the true client.
-  trustProxy: 'loopback',
   logger: {
     transport: {
       targets: [

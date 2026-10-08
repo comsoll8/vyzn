@@ -90,13 +90,8 @@ function tokenFromRequest(req) {
   return parseCookies(req.headers.cookie)[COOKIE] || null;
 }
 
-function isHttps(reply) {
-  const r = reply && reply.request;
-  return !!(r && r.protocol === 'https');
-}
 function setCookie(reply, token, maxAgeMs) {
   let c = `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax`;
-  if (isHttps(reply)) c += '; Secure';
   if (maxAgeMs) c += `; Max-Age=${Math.floor(maxAgeMs / 1000)}`;
   reply.header('Set-Cookie', c);
 }
@@ -220,8 +215,6 @@ function register(fastify) {
 
   function loginWith(username, password, req) {
     if (limited(`login:${ip(req)}`, 10, 60 * 1000)) return { error: 'rate_limited' };
-    // Per-account cap too, so a botnet can't guess one password from many IPs.
-    if (limited(`loginuser:${String(username || '').trim().toLowerCase().slice(0, 64)}`, 30, 15 * 60 * 1000)) return { error: 'rate_limited' };
     const u = db.prepare('SELECT * FROM users WHERE username = ?').get(String(username || '').trim());
     const ok = verifyPassword(String(password || ''), u ? u.password_hash : DUMMY_HASH);
     return u && ok ? { user: u } : { error: 'invalid_credentials' };
