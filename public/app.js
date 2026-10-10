@@ -1031,10 +1031,11 @@ async function renderHome() {
   gridEl.classList.add('hidden');
 
   const profileId = state.profile ? state.profile.id : '';
-  const [continueWatching, recommendations, trending] = await Promise.all([
+  const [continueWatching, recommendations, trending, fresh] = await Promise.all([
     profileId ? fetchJson(`/api/profiles/${profileId}/continue-watching`) : [],
     profileId ? fetchJson(`/api/profiles/${profileId}/recommendations`) : [],
     profileId ? fetchJson(`/api/profiles/${profileId}/trending`) : [],
+    profileId ? fetchJson(`/api/profiles/${profileId}/new`).catch(() => null) : null,
   ]);
 
   const heroSource = (continueWatching[0]) ||
@@ -1065,6 +1066,13 @@ async function renderHome() {
   // `kind`), so it needs the same dispatching card builder a genre shelf
   // uses rather than the movie-only default.
   rowDescriptors.push({ title: 'Trending', items: trending, cardBuilder: genreMediaCard });
+  // "New on VYZN": recently added titles, movies and shows on separate
+  // shelves. Part of the shuffled set like every other row; renderShelf
+  // skips a shelf that has nothing in the recent window.
+  if (fresh && !fresh.error) {
+    rowDescriptors.push({ title: 'New on VYZN · Movies', items: Array.isArray(fresh.movies) ? fresh.movies : [], cardBuilder: posterCard });
+    rowDescriptors.push({ title: 'New on VYZN · TV Shows', items: Array.isArray(fresh.shows) ? fresh.shows : [], cardBuilder: showCard });
+  }
   rowDescriptors.push(...(await genreRowDescriptors(profileId)));
 
   for (const row of shuffle(rowDescriptors)) {

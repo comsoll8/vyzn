@@ -1168,6 +1168,41 @@ async function main() {
     return rotateForToday(filterByProfile(rows, profileId));
   });
 
+  // "New on VYZN": what was added to the library recently, movies and shows
+  // kept separate so the Home page can show each on its own shelf. Movies
+  // are ranked by when their file was first indexed (media_items.added_at is
+  // set once and never touched by rescans); a show is as new as its newest
+  // episode, so a fresh episode/season of an existing show surfaces too.
+  // Only items from the last NEW_WINDOW_DAYS count — otherwise the initial
+  // library scan (everything "added" the same day) would make the shelf
+  // meaningless forever. Rating-filtered for the profile like every shelf.
+  const NEW_WINDOW_DAYS = 30;
+  const NEW_SHELF_LIMIT = 20;
+  fastify.get('/api/profiles/:profileId/new', async (request) => {
+    const profileId = Number(request.params.profileId);
+    const since = `-${NEW_WINDOW_DAYS} days`;
+    const movies = db.prepare(`
+      SELECT m.*, p.completed, 'movie' AS kind
+      FROM media_items m
+      LEFT JOIN playback_progress p ON p.media_id = m.id AND p.profile_id = @profileId
+      WHERE m.media_type = 'movie' AND m.added_at >= datetime('now', @since)
+      ORDER BY m.added_at DESC, m.id DESC LIMIT @limit
+    `).all({ profileId, since, limit: NEW_SHELF_LIMIT * 2 });
+    const shows = db.prepare(`
+      SELECT s.*, COUNT(e.id) AS total_episodes, MAX(m.added_at) AS latest_added, 'show' AS kind
+      FROM tv_shows s
+      JOIN tv_episodes e ON e.show_id = s.id
+      JOIN media_items m ON m.id = e.media_item_id
+      GROUP BY s.id
+      HAVING MAX(m.added_at) >= datetime('now', @since)
+      ORDER BY latest_added DESC, s.id DESC LIMIT @limit
+    `).all({ since, limit: NEW_SHELF_LIMIT * 2 });
+    return {
+      movies: filterByProfile(movies, profileId).slice(0, NEW_SHELF_LIMIT),
+      shows: filterByProfile(shows, profileId).slice(0, NEW_SHELF_LIMIT),
+    };
+  });
+
   // Removes a profile's playback progress for one item — used both for
   // "Remove from Continue Watching" (just drops the row, nothing else to
   // do) and "Restart from Beginning" (the frontend deletes the old
