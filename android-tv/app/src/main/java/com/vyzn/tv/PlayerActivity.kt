@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.graphics.BitmapFactory
 import android.util.Log
+import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
@@ -26,6 +27,7 @@ import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.ui.DefaultTimeBar
 import androidx.media3.ui.PlayerView
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -555,6 +557,43 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private data class SubtitleInfo(val url: String, val language: String?)
+
+    // D-pad scrubbing. By default ExoPlayer's controller is hidden, the first
+    // Left/Right only wakes it, and then Left/Right just hop between the
+    // control buttons — so you could never hold an arrow to wind through the
+    // video. Here Left/Right (with the controls hidden, or with the timeline
+    // already focused) always goes to the timeline bar, which scrubs on every
+    // key repeat; the step grows the longer the key is held, and the seek is
+    // committed shortly after you let go. Press Down to reach the buttons
+    // (CC, etc.); while one of them is focused, Left/Right navigate between
+    // buttons as before.
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val code = event.keyCode
+        val isHorizontal = code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT
+        if (isHorizontal && player != null && upNextCard.visibility != View.VISIBLE) {
+            val timeBarId = resources.getIdentifier("exo_progress", "id", packageName)
+            val timeBar = if (timeBarId != 0) playerView.findViewById<View>(timeBarId) else null
+            if (timeBar is DefaultTimeBar) {
+                val controlsUp = playerView.isControllerFullyVisible
+                if (!controlsUp || timeBar.hasFocus()) {
+                    if (!controlsUp) playerView.showController()
+                    if (!timeBar.hasFocus()) timeBar.requestFocus()
+                    // Longer hold -> bigger jumps (10s, then 20s, then 45s per key repeat).
+                    val repeat = event.repeatCount
+                    timeBar.setKeyTimeIncrement(
+                        when {
+                            repeat < 8 -> 10_000L
+                            repeat < 25 -> 20_000L
+                            else -> 45_000L
+                        }
+                    )
+                    playerView.showController() // keep the bar on screen while scrubbing
+                    return timeBar.dispatchKeyEvent(event)
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
 
     override fun onDestroy() {
         stopProgressReporting()
