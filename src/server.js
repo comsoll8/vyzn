@@ -86,6 +86,23 @@ const TRANSCODE_DIR = process.env.TRANSCODE_DIR || path.join(__dirname, '..', 't
 // Filters a list of media_items rows down to what a given profile is
 // allowed to see, based on content_rating vs. the profile's
 // max_content_rating. No profile_id (or an unknown one) means no filtering.
+// The same movie can be indexed more than once (a 4K and a 1080p copy, or a
+// duplicate download). Shelves and grids should show each film once, so keep
+// a single row per TMDB id — the larger file, which is usually the better
+// copy — in the position the first copy held. Unmatched files, shows and
+// episodes are untouched.
+function dedupeMovies(rows) {
+  const out = [];
+  const seen = new Map(); // tmdb_id -> index in out
+  for (const r of rows) {
+    if (!r || r.media_type !== 'movie' || !r.tmdb_id) { out.push(r); continue; }
+    const at = seen.get(r.tmdb_id);
+    if (at === undefined) { seen.set(r.tmdb_id, out.length); out.push(r); }
+    else if ((r.file_size || 0) > (out[at].file_size || 0)) out[at] = r;
+  }
+  return out;
+}
+
 function filterByProfile(rows, profileId) {
   if (!profileId) return rows;
   const profile = db.prepare('SELECT * FROM profiles WHERE id = ?').get(profileId);
@@ -592,7 +609,7 @@ async function main() {
     } else {
       rows = db.prepare('SELECT * FROM media_items ORDER BY title').all();
     }
-    return filterByProfile(rows, profileId);
+    return dedupeMovies(filterByProfile(rows, profileId));
   });
 
   // Everything without a TMDB match yet, for the settings page's "Unmatched"
@@ -1166,8 +1183,8 @@ async function main() {
       SELECT m.*, p.completed, 'movie' AS kind
       FROM media_items m
       LEFT JOIN playback_progress p ON p.media_id = m.id AND p.profile_id = @profileId
-      WHERE m.tmdb_id IS NOT NULL
-      ORDER BY m.rating DESC LIMIT 22
+      WHERE m.tmdb_id IS NOT NULL AND m.media_type = 'movie'
+      ORDER BY m.rating DESC LIMIT 60
     `).all({ profileId });
     const shows = db.prepare(`
       SELECT s.*, COUNT(e.id) AS total_episodes, 'show' AS kind
@@ -1176,7 +1193,7 @@ async function main() {
       GROUP BY s.id
       ORDER BY s.title ASC LIMIT 8
     `).all();
-    const rows = [...movies, ...shows];
+    const rows = [...dedupeMovies(movies).slice(0, 22), ...shows];
     return rotateForToday(filterByProfile(rows, profileId));
   });
 
@@ -1209,7 +1226,7 @@ async function main() {
       ORDER BY latest_added DESC, s.id DESC LIMIT @limit
     `).all({ since, limit: NEW_SHELF_LIMIT * 2 });
     return {
-      movies: filterByProfile(movies, profileId).slice(0, NEW_SHELF_LIMIT),
+      movies: dedupeMovies(filterByProfile(movies, profileId)).slice(0, NEW_SHELF_LIMIT),
       shows: filterByProfile(shows, profileId).slice(0, NEW_SHELF_LIMIT),
     };
   };
@@ -1561,7 +1578,7 @@ async function main() {
       ORDER BY s.title ASC
     `).all(genreId);
 
-    const filteredMovies = filterByProfile(movies, profileId);
+    const filteredMovies = dedupeMovies(filterByProfile(movies, profileId));
     let filteredShows = shows;
     if (profileId) {
       const profile = db.prepare('SELECT * FROM profiles WHERE id = ?').get(profileId);
