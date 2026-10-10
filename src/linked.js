@@ -198,6 +198,26 @@ function register(fastify, { filterByProfile, hasUsers }) {
       const j = JSON.stringify(item);
       if (j.length <= 30000) itemJson = j;
     }
+    // The native TV player reports by id only (no title snapshot), e.g. when it
+    // auto-advances to the next episode. If we have no snapshot for this title
+    // yet, fetch its details from the other server so it can appear in
+    // Continue Watching.
+    if (!itemJson) {
+      const have = db.prepare('SELECT item_json FROM remote_progress WHERE profile_id = ? AND server_id = ? AND media_id = ?')
+        .get(profileId, Number(serverId), Number(mediaId));
+      if (!have || !have.item_json) {
+        try {
+          const res = await callPeer(get(serverId), `/api/library/${Number(mediaId)}`, { timeoutMs: 5000 });
+          if (res.ok) {
+            const row = await res.json();
+            if (row && typeof row === 'object') {
+              const j = JSON.stringify(row);
+              if (j.length <= 30000) itemJson = j;
+            }
+          }
+        } catch { /* offline — progress still saved, just without a card */ }
+      }
+    }
     db.prepare(`
       INSERT INTO remote_progress (profile_id, server_id, media_id, position_seconds, duration_seconds, completed, item_json, last_watched_at)
       VALUES (@profileId, @serverId, @mediaId, @position, @duration, @completed, @itemJson, datetime('now'))
