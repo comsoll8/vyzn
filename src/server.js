@@ -411,6 +411,15 @@ async function main() {
     root: path.join(__dirname, '..', 'public'),
     prefix: '/',
     decorateReply: false,
+    // The page, scripts and styles must be revalidated on every load
+    // (cheap: the ETag makes it a 304 when unchanged) so a server update
+    // shows up on the next launch of the browser tab / Android TV app's
+    // WebView instead of whenever its cache happens to expire. Images and
+    // avatars can be cached for an hour.
+    cacheControl: false,
+    setHeaders(res, filePath) {
+      res.setHeader('Cache-Control', /\.(html|js|css|json)$/i.test(filePath) ? 'no-cache' : 'public, max-age=3600');
+    },
   });
 
   fastify.get('/health', async () => ({ status: 'ok' }));
