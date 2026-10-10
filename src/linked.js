@@ -9,6 +9,7 @@
  * limit to the answer, and hands it back. Browsing only — playback is
  * proxied separately.
  */
+const { Readable } = require('stream');
 const db = require('./db');
 const peers = require('./peers');
 
@@ -78,6 +79,58 @@ function register(fastify, { filterByProfile, hasUsers }) {
     db.prepare('DELETE FROM linked_servers WHERE id = ?').run(Number(req.params.id));
     for (const k of cache.keys()) if (k.startsWith(`${Number(req.params.id)}|`)) cache.delete(k);
     return { ok: true };
+  });
+
+  // --- Playback ---------------------------------------------------------
+  // Start a stream on the other server. The JSON it returns points at that
+  // server's /stream-files/..., so rewrite those to this server's file
+  // proxy below; the browser then only ever talks to this server.
+  fastify.get('/api/remote/:id/stream/:mediaId', async (req, reply) => {
+    const server = get(req.params.id);
+    if (!server) return reply.code(404).send({ error: 'No such linked server.' });
+    const mediaId = Number(req.params.mediaId);
+    if (!Number.isInteger(mediaId)) return reply.code(400).send({ error: 'bad_media_id' });
+    const q = req.query.audio_track !== undefined && /^\d+$/.test(String(req.query.audio_track))
+      ? `?audio_track=${req.query.audio_track}` : '';
+    let res;
+    try {
+      res = await callPeer(server, `/api/stream/${mediaId}${q}`, { timeoutMs: 90000 });
+    } catch {
+      return reply.code(502).send({ error: `${server.name} can't be reached right now.` });
+    }
+    if (res.status === 401) return reply.code(502).send({ error: `${server.name} no longer accepts this server's token.` });
+    let body = null;
+    try { body = await res.json(); } catch { /* not json */ }
+    if (!res.ok || !body) return reply.code(res.ok ? 502 : res.status).send(body || { error: 'remote_error' });
+    const base = `/api/remote/${server.id}/files/`;
+    const rewrite = (u) => (typeof u === 'string' && u.startsWith('/stream-files/') ? base + u.slice('/stream-files/'.length) : u);
+    return { ...body, playlistUrl: rewrite(body.playlistUrl), subtitleUrl: rewrite(body.subtitleUrl) };
+  });
+
+  // Pipe the other server's HLS playlist/segments/subtitles through,
+  // forwarding Range so seeking works.
+  fastify.get('/api/remote/:id/files/*', async (req, reply) => {
+    const server = get(req.params.id);
+    if (!server) return reply.code(404).send({ error: 'No such linked server.' });
+    const rel = String(req.params['*'] || '');
+    if (!rel || rel.split('/').some((seg) => seg === '..' || seg === '')) return reply.code(400).send({ error: 'bad_path' });
+    const ac = new AbortController();
+    req.raw.on('close', () => ac.abort());
+    let up;
+    try {
+      const headers = { Authorization: `Bearer ${server.token}`, 'User-Agent': 'vyzn-linked' };
+      if (req.headers.range) headers.Range = req.headers.range;
+      up = await fetch(`${server.url}/stream-files/${rel.split('/').map(encodeURIComponent).join('/')}`, { headers, signal: ac.signal });
+    } catch {
+      return reply.code(502).send({ error: 'server_unreachable' });
+    }
+    reply.code(up.status);
+    for (const h of ['content-type', 'content-length', 'content-range', 'accept-ranges', 'cache-control']) {
+      const v = up.headers.get(h);
+      if (v) reply.header(h, v);
+    }
+    if (!up.body) return reply.send();
+    return reply.send(Readable.fromWeb(up.body));
   });
 
   // Read-only browse proxy: /api/remote/:id/<anything on the allowlist>

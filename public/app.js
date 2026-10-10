@@ -2559,6 +2559,7 @@ function getKnownDuration() {
 function reportProgress() {
   const duration = getKnownDuration();
   if (!state.currentItem || !state.profile || !duration) return;
+  if (state.currentItem._remote) return; // it lives on another server — no local history for it yet
   fetch(`/api/profiles/${state.profile.id}/progress`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -2659,7 +2660,7 @@ async function startStreamAndAttach(item, { audioTrackIndex, resumeTime, autopla
   }
   const effectiveIndex = audioTrackIndex !== undefined ? audioTrackIndex : pickPreferredAudioIndex(knownAudioTracks);
   const query = effectiveIndex !== undefined ? `?audio_track=${effectiveIndex}` : '';
-  const res = await fetch(`/api/stream/${item.id}${query}`);
+  const res = await fetch(item._remote ? `/api/remote/${item._remote}/stream/${item.id}${query}` : `/api/stream/${item.id}${query}`);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || `Server returned ${res.status}`);
   if (!data.playlistUrl) throw new Error('No playlist URL returned');
@@ -2791,7 +2792,9 @@ async function switchAudioTrack(index) {
 }
 
 async function openPlayer(item) {
-  if (isRemote()) { toast(`Playing from ${state.server.name} isn't available yet — coming in the next update.`); return; }
+  // Titles from a linked server play through the in-page player (never the
+  // native one, which talks to this server's own files and progress).
+  item._remote = state.server ? state.server.id : null;
   // Android TV app only: hand playback off to the app's native
   // (ExoPlayer-backed) player instead of this browser's HLS/hls.js
   // pipeline, so multichannel (5.1+) audio reaches the TV/AVR intact
@@ -2808,7 +2811,7 @@ async function openPlayer(item) {
   // login cookie (it reports that via supportsAuth()). Older builds would
   // just get 401s ("ERROR_CODE_IO_BAD_HTTP_STATUS"), so they fall back to the
   // in-page player below until the app is updated.
-  const nativeOk = window.VyznNativePlayer && typeof window.VyznNativePlayer.play === 'function'
+  const nativeOk = !item._remote && window.VyznNativePlayer && typeof window.VyznNativePlayer.play === 'function'
     && (!(window.VyznAuth && window.VyznAuth.authRequired()) || typeof window.VyznNativePlayer.supportsAuth === 'function');
   if (nativeOk) {
     window.VyznNativePlayer.play(JSON.stringify({
@@ -2977,6 +2980,7 @@ playerControlsEl.addEventListener('focusin', showPlayerControls);
 async function triggerPostPlayback() {
   if (postPlaybackTriggered || !state.currentItem) return;
   postPlaybackTriggered = true;
+  if (state.currentItem._remote) return; // next-up/recommendations are about this server's own library
 
   const profileId = state.profile ? state.profile.id : '';
   const url = profileId
