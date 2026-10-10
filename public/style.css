@@ -2774,3 +2774,42 @@ select:focus-visible,
   padding: 8px 12px; border-radius: 6px; font-size: 13px; color-scheme: dark;
 }
 .autoscan-form { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+
+/* --- Linked servers ---------------------------------------------------- */
+.cc-server-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.cc-server-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06); color: var(--text); font: inherit; cursor: pointer;
+}
+.cc-server-row.active { border-color: var(--accent, #e50914); background: rgba(255,255,255,0.14); }
+.cc-server-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.35); flex: none; }
+.cc-server-row.active .cc-server-dot { background: var(--accent, #e50914); }
+.cc-server-row .cc-server-sub { margin-left: auto; font-size: 11px; color: var(--text-dim); }
+#ccServerManage input { display: block; width: 100%; box-sizing: border-box; margin: 6px 0; padding: 8px 10px;
+  border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: rgba(0,0,0,0.3); color: var(--text); font: inherit; }
+#ccServerManage h4 { margin: 14px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); }
+#ccServerManage h4:first-child { margin-top: 0; }
+.cc-linked-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; }
+.cc-linked-row .cc-linked-meta { color: var(--text-dim); font-size: 11px; margin-left: auto; text-align: right; }
+.cc-linked-row button { flex: none; padding: 2px 10px; }
+.cc-token { margin-top: 8px; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.4);
+  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; word-break: break-all; user-select: all; }
+.cc-token small { display: block; margin-top: 6px; font-family: inherit; color: var(--text-dim); user-select: none; }
+.server-banner {
+  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 900;
+  display: flex; align-items: center; gap: 14px; padding: 10px 16px; border-radius: 999px;
+  background: rgba(20,20,24,0.92); border: 1px solid rgba(255,255,255,0.18);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5); font-size: 14px; max-width: calc(100vw - 32px);
+}
+.server-banner.hidden { display: none; }
+.server-banner button { white-space: nowrap; }
+.vyzn-toast {
+  position: fixed; left: 50%; top: 24px; transform: translateX(-50%); z-index: 3000;
+  padding: 12px 18px; border-radius: 10px; background: rgba(20,20,24,0.95);
+  border: 1px solid rgba(255,255,255,0.2); font-size: 14px; max-width: calc(100vw - 32px);
+}
+
+.remote-hidden { display: none !important; }
+#ccServerManage .unmatched-status { font-size: 12px; margin: 6px 0 0; color: var(--text-dim); }
+#ccServerManage .unmatched-status.err { color: #e57373; }

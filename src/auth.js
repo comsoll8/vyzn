@@ -173,6 +173,7 @@ const ADMIN_ONLY = [
   ['GET', /^\/api\/settings\/config$/], ['PUT', /^\/api\/settings\/config$/],
   ['*', /^\/api\/tailscale\//],
   ['*', /^\/api\/peers(\/|$)/],
+  ['POST', /^\/api\/linked-servers$/], ['DELETE', /^\/api\/linked-servers\/\d+$/],
   ['POST', /^\/api\/scan$/],
   ['POST', /^\/api\/library\/(purge|retry-unmatched|backfill-genres)$/],
   ['DELETE', /^\/api\/library$/], ['POST', /^\/api\/library\/\d+\/rematch$/],

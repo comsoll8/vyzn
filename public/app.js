@@ -11,7 +11,29 @@ const state = {
   profile: null, // { id, name, avatar, is_child, max_content_rating }
   currentItem: null,
   seerrConfigured: false, // whether the server has SEERR_URL/SEERR_API_KEY set
+  server: null, // null = this server; otherwise { id, name } of a linked server being browsed (read-only)
 };
+
+const isRemote = () => !!state.server;
+
+// While browsing a linked server, library/show/genre reads are routed
+// through this server's read-only proxy (/api/remote/:id/...).
+function apiUrl(url) {
+  if (!state.server || typeof url !== 'string') return url;
+  const base = `/api/remote/${state.server.id}`;
+  const fresh = url.match(/^\/api\/profiles\/(\d+)\/new$/);
+  if (fresh) return `${base}/peer/new?profile_id=${fresh[1]}`;
+  if (/^\/api\/(library(?!\/unmatched)|shows|genres)(\/|\?|$)/.test(url)) return base + url.slice(4);
+  return url;
+}
+
+function toast(msg, ms = 3500) {
+  const el = document.createElement('div');
+  el.className = 'vyzn-toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), ms);
+}
 
 // How many genre shelves to build on the Home view, picked by highest
 // item count first — enough for a rich home screen without firing off a
@@ -1043,10 +1065,13 @@ async function renderHome() {
   gridEl.classList.add('hidden');
 
   const profileId = state.profile ? state.profile.id : '';
+  // Personal rows (continue watching, recommendations, trending) are about
+  // this server's own history, so a linked server only gets New + genres.
+  const own = profileId && !isRemote();
   const [continueWatching, recommendations, trending, fresh] = await Promise.all([
-    profileId ? fetchJson(`/api/profiles/${profileId}/continue-watching`) : [],
-    profileId ? fetchJson(`/api/profiles/${profileId}/recommendations`) : [],
-    profileId ? fetchJson(`/api/profiles/${profileId}/trending`) : [],
+    own ? fetchJson(`/api/profiles/${profileId}/continue-watching`) : [],
+    own ? fetchJson(`/api/profiles/${profileId}/recommendations`) : [],
+    own ? fetchJson(`/api/profiles/${profileId}/trending`) : [],
     profileId ? fetchJson(`/api/profiles/${profileId}/new`).catch(() => null) : null,
   ]);
 
@@ -1240,7 +1265,7 @@ window.addEventListener('resize', () => {
 
 async function fetchJson(url) {
   try {
-    const res = await fetch(url);
+    const res = await fetch(apiUrl(url));
     if (!res.ok) return [];
     return await res.json();
   } catch (err) {
@@ -1257,7 +1282,7 @@ async function fetchJson(url) {
 // touching the DOM.
 let seerrSearchToken = 0;
 async function fetchSeerrExtras(query) {
-  if (!state.seerrConfigured || !query || query.trim().length < 2) return [];
+  if (isRemote() || !state.seerrConfigured || !query || query.trim().length < 2) return [];
   const profileId = state.profile ? state.profile.id : '';
   const url = `/api/seerr/search?query=${encodeURIComponent(query)}${profileId ? `&profile_id=${profileId}` : ''}`;
   return fetchJson(url);
@@ -1764,6 +1789,7 @@ async function openShowDetail(showId) {
   showDetailEl.scrollTop = 0;
   showDetailFilesPanel.classList.add('hidden');
   showDetailFilesBtn.setAttribute('aria-expanded', 'false');
+  applyRemoteDetailMode();
   showDetailTitleEl.textContent = show.title;
   showDetailBackdropEl.style.backgroundImage = show.backdrop_url ? `url(${show.backdrop_url})` : 'none';
   showDetailOverviewEl.textContent = show.overview || '';
@@ -2163,6 +2189,7 @@ async function openMovieDetail(item, { forceRefresh = false } = {}) {
   movieDetailEditMatchTitleEl.value = item.tmdb_matched_title || item.title;
   movieDetailEditMatchTypeEl.value = item.media_type === 'tv' ? 'tv' : 'movie';
   renderFileInfo(movieDetailFileInfoEl, item);
+  applyRemoteDetailMode();
 
   movieDetailPlayBtn.onclick = () => { hideMovieDetailInternal(); openPlayer(item); };
   movieDetailWatchedBtn.onclick = () => {
@@ -2330,6 +2357,20 @@ function closeMovieDetailMenu() {
 movieDetailEl.addEventListener('scroll', closeMovieDetailMenu);
 window.addEventListener('resize', closeMovieDetailMenu);
 
+// Linked servers are read-only: hide everything that would write to (or read
+// local state for) an item that actually lives on the other server.
+function applyRemoteDetailMode() {
+  const remote = isRemote();
+  for (const el of [movieDetailEditMatchBtn, movieDetailWatchedBtn, movieDetailWatchlistBtn,
+                    showDetailWatchlistBtn, showDetailFilesBtn]) {
+    if (el) el.classList.toggle('remote-hidden', remote);
+  }
+  if (remote) {
+    movieDetailEditMatchPanel.classList.add('hidden');
+    showDetailFilesPanel.classList.add('hidden');
+  }
+}
+
 // --- File location info (so you can tell which actual file a title is) ----
 function formatFileSize(bytes) {
   if (!bytes || bytes <= 0) return '';
@@ -2481,7 +2522,7 @@ async function loadLibrary() {
   const profileId = state.profile ? state.profile.id : '';
   const url = profileId ? `/api/library?profile_id=${profileId}` : '/api/library';
   const [items, genres, settings] = await Promise.all([
-    fetch(url).then((r) => r.json()),
+    fetchJson(url),
     fetchJson('/api/genres'),
     fetchJson('/api/settings'),
   ]);
@@ -2750,6 +2791,7 @@ async function switchAudioTrack(index) {
 }
 
 async function openPlayer(item) {
+  if (isRemote()) { toast(`Playing from ${state.server.name} isn't available yet — coming in the next update.`); return; }
   // Android TV app only: hand playback off to the app's native
   // (ExoPlayer-backed) player instead of this browser's HLS/hls.js
   // pipeline, so multichannel (5.1+) audio reaches the TV/AVR intact
@@ -3201,6 +3243,7 @@ function openControlCenter() {
   ccSystemInfoPanelEl.classList.add('hidden');
   ccScanInfoEl.textContent = '';
   renderCcProfiles();
+  renderCcServers();
   enterOverlay();
 }
 
@@ -3363,6 +3406,204 @@ document.addEventListener('keydown', (e) => {
     if (controlCenterEl.classList.contains('hidden')) openControlCenter();
     else closeControlCenter();
   }
+});
+
+
+// --- Linked servers: pick which server's library to browse ----------------
+const ccServerSectionEl = document.getElementById('ccServerSection');
+const ccServerListEl = document.getElementById('ccServerList');
+const ccServerManageBtn = document.getElementById('ccServerManageBtn');
+const ccServerManageEl = document.getElementById('ccServerManage');
+const ccLinkedListEl = document.getElementById('ccLinkedList');
+const ccLinkNameEl = document.getElementById('ccLinkName');
+const ccLinkUrlEl = document.getElementById('ccLinkUrl');
+const ccLinkTokenEl = document.getElementById('ccLinkToken');
+const ccLinkAddBtn = document.getElementById('ccLinkAddBtn');
+const ccLinkStatusEl = document.getElementById('ccLinkStatus');
+const ccPeerListEl = document.getElementById('ccPeerList');
+const ccPeerNameEl = document.getElementById('ccPeerName');
+const ccPeerCreateBtn = document.getElementById('ccPeerCreateBtn');
+const ccPeerTokenEl = document.getElementById('ccPeerToken');
+const ccPeerStatusEl = document.getElementById('ccPeerStatus');
+const serverBannerEl = document.getElementById('serverBanner');
+const serverBannerTextEl = document.getElementById('serverBannerText');
+const serverBannerBackBtn = document.getElementById('serverBannerBack');
+
+let linkedServers = [];
+let isAdminUser = false;
+
+async function fetchLinkedServers() {
+  try {
+    const res = await fetch('/api/linked-servers');
+    const rows = res.ok ? await res.json() : [];
+    return Array.isArray(rows) ? rows : [];
+  } catch { return []; }
+}
+
+function serverRow(label, sub, active, onClick) {
+  const row = document.createElement('button');
+  row.type = 'button';
+  row.className = 'cc-server-row' + (active ? ' active' : '');
+  const dot = document.createElement('span');
+  dot.className = 'cc-server-dot';
+  const name = document.createElement('span');
+  name.textContent = label;
+  row.appendChild(dot);
+  row.appendChild(name);
+  if (sub) {
+    const s = document.createElement('span');
+    s.className = 'cc-server-sub';
+    s.textContent = sub;
+    row.appendChild(s);
+  }
+  row.addEventListener('click', onClick);
+  return row;
+}
+
+async function renderCcServers() {
+  linkedServers = await fetchLinkedServers();
+  try {
+    const v = await (await fetch('/api/auth/status')).json();
+    isAdminUser = !v.authRequired || !!(v.user && v.user.isAdmin);
+  } catch { isAdminUser = false; }
+  ccServerSectionEl.classList.toggle('hidden', linkedServers.length === 0 && !isAdminUser);
+  ccServerManageBtn.classList.toggle('hidden', !isAdminUser);
+  ccServerListEl.innerHTML = '';
+  ccServerListEl.appendChild(serverRow('This server', null, !state.server, () => switchServer(null)));
+  for (const s of linkedServers) {
+    ccServerListEl.appendChild(serverRow(s.name, 'linked', state.server && state.server.id === s.id, () => switchServer(s)));
+  }
+}
+
+function updateServerBanner() {
+  serverBannerEl.classList.toggle('hidden', !state.server);
+  if (state.server) serverBannerTextEl.textContent = `Browsing ${state.server.name} · read-only`;
+}
+
+async function switchServer(server) {
+  const same = (!server && !state.server) || (server && state.server && server.id === state.server.id);
+  if (same) { closeControlCenter(); return; }
+  state.server = server ? { id: server.id, name: server.name } : null;
+  state.query = '';
+  searchEl.value = '';
+  state.tab = 'home';
+  document.querySelectorAll('.tab-btn[data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === 'home'));
+  resetGenreFilter();
+  updateServerBanner();
+  closeControlCenter();
+  await loadLibrary();
+  if (server && state.items.length === 0) {
+    toast(`Couldn't load ${server.name}'s library. It may be offline, or its access token may have been revoked.`, 6000);
+  }
+}
+
+serverBannerBackBtn.addEventListener('click', () => switchServer(null));
+
+async function renderLinkedAdmin() {
+  ccLinkedListEl.innerHTML = '';
+  for (const s of linkedServers) {
+    const row = document.createElement('div');
+    row.className = 'cc-linked-row';
+    const label = document.createElement('span');
+    label.textContent = s.name;
+    const meta = document.createElement('span');
+    meta.className = 'cc-linked-meta';
+    meta.textContent = s.url || '';
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'btn-secondary';
+    rm.textContent = 'Remove';
+    rm.addEventListener('click', async () => {
+      await fetch(`/api/linked-servers/${s.id}`, { method: 'DELETE' });
+      if (state.server && state.server.id === s.id) await switchServer(null);
+      await renderCcServers();
+      await renderLinkedAdmin();
+    });
+    row.append(label, meta, rm);
+    ccLinkedListEl.appendChild(row);
+  }
+  ccPeerListEl.innerHTML = '';
+  let peers = [];
+  try { const r = await fetch('/api/peers'); peers = r.ok ? await r.json() : []; } catch { /* ignore */ }
+  for (const p of peers) {
+    const row = document.createElement('div');
+    row.className = 'cc-linked-row';
+    const label = document.createElement('span');
+    label.textContent = p.name;
+    const meta = document.createElement('span');
+    meta.className = 'cc-linked-meta';
+    meta.textContent = p.streaming && p.streaming.length
+      ? `streaming: ${p.streaming.map((x) => x.title).join(', ')}`
+      : (p.lastUsedAt ? `last used ${new Date(p.lastUsedAt).toLocaleString()}` : 'never used');
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'btn-secondary';
+    rm.textContent = 'Revoke';
+    rm.addEventListener('click', async () => {
+      await fetch(`/api/peers/${p.id}`, { method: 'DELETE' });
+      await renderLinkedAdmin();
+    });
+    row.append(label, meta, rm);
+    ccPeerListEl.appendChild(row);
+  }
+}
+
+ccServerManageBtn.addEventListener('click', async () => {
+  const open = ccServerManageEl.classList.contains('hidden');
+  ccServerManageEl.classList.toggle('hidden', !open);
+  ccServerManageBtn.setAttribute('aria-expanded', String(open));
+  if (open) await renderLinkedAdmin();
+});
+
+ccLinkAddBtn.addEventListener('click', async () => {
+  ccLinkStatusEl.className = 'unmatched-status';
+  ccLinkStatusEl.textContent = 'Connecting…';
+  ccLinkAddBtn.disabled = true;
+  try {
+    const res = await fetch('/api/linked-servers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: ccLinkNameEl.value, url: ccLinkUrlEl.value, token: ccLinkTokenEl.value }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      ccLinkStatusEl.className = 'unmatched-status err';
+      ccLinkStatusEl.textContent = data.error || 'Could not add that server.';
+      return;
+    }
+    ccLinkStatusEl.textContent = `Added ${data.name}${data.movies != null ? ` — ${data.movies} movies, ${data.shows} shows` : ''}.`;
+    ccLinkNameEl.value = ccLinkUrlEl.value = ccLinkTokenEl.value = '';
+    await renderCcServers();
+    await renderLinkedAdmin();
+  } catch (err) {
+    ccLinkStatusEl.className = 'unmatched-status err';
+    ccLinkStatusEl.textContent = 'Could not add that server.';
+  } finally {
+    ccLinkAddBtn.disabled = false;
+  }
+});
+
+ccPeerCreateBtn.addEventListener('click', async () => {
+  ccPeerStatusEl.className = 'unmatched-status';
+  ccPeerStatusEl.textContent = '';
+  const res = await fetch('/api/peers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: ccPeerNameEl.value }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    ccPeerStatusEl.className = 'unmatched-status err';
+    ccPeerStatusEl.textContent = data.error || 'Could not create a token.';
+    return;
+  }
+  ccPeerNameEl.value = '';
+  ccPeerTokenEl.classList.remove('hidden');
+  ccPeerTokenEl.textContent = data.token;
+  const note = document.createElement('small');
+  note.textContent = `Copy this now — it won't be shown again. On ${data.name}: Control Center → Server → Manage → Add Server, address ${location.origin}`;
+  ccPeerTokenEl.appendChild(note);
+  await renderLinkedAdmin();
 });
 
 // --- Tabs / search / scan --------------------------------------------------

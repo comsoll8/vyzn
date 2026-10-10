@@ -57,6 +57,7 @@ const config = require('./config');
 const tailscale = require('./tailscale');
 const auth = require('./auth');
 const activity = require('./activity');
+const linked = require('./linked');
 const autoscan = require('./autoscan');
 
 // Plain X.Y.Z numeric comparison for the "Check for Updates" route —
@@ -421,6 +422,8 @@ async function main() {
       res.setHeader('Cache-Control', /\.(html|js|css|json)$/i.test(filePath) ? 'no-cache' : 'public, max-age=3600');
     },
   });
+
+  linked.register(fastify, { filterByProfile, hasUsers: auth.hasUsers });
 
   fastify.get('/health', async () => ({ status: 'ok' }));
 

@@ -433,6 +433,28 @@
       <button id="ccSignOutBtn" class="btn-secondary cc-full-btn hidden">Sign Out</button>
     </section>
 
+    <section class="cc-section hidden" id="ccServerSection">
+      <h3>Server</h3>
+      <div id="ccServerList" class="cc-server-list"></div>
+      <button id="ccServerManageBtn" class="btn-secondary cc-full-btn hidden" type="button" aria-expanded="false">Manage Linked Servers</button>
+      <div id="ccServerManage" class="cc-subpanel hidden">
+        <h4>Browse another server</h4>
+        <div id="ccLinkedList" class="cc-linked-list"></div>
+        <input id="ccLinkName" type="text" placeholder="Name (e.g. Cupcake)" autocomplete="off">
+        <input id="ccLinkUrl" type="text" placeholder="Address (e.g. http://cupcake:18080)" autocomplete="off" autocapitalize="off">
+        <input id="ccLinkToken" type="text" placeholder="Access token (vzp_…)" autocomplete="off" autocapitalize="off">
+        <button id="ccLinkAddBtn" class="btn-secondary cc-full-btn" type="button">Add Server</button>
+        <p id="ccLinkStatus" class="unmatched-status"></p>
+
+        <h4>Let another server browse this one</h4>
+        <div id="ccPeerList" class="cc-linked-list"></div>
+        <input id="ccPeerName" type="text" placeholder="Name of the other server" autocomplete="off">
+        <button id="ccPeerCreateBtn" class="btn-secondary cc-full-btn" type="button">Create Access Token</button>
+        <div id="ccPeerToken" class="cc-token hidden"></div>
+        <p id="ccPeerStatus" class="unmatched-status"></p>
+      </div>
+    </section>
+
     <section class="cc-section">
       <h3>Quick Actions</h3>
       <div class="cc-quick-actions">
@@ -447,6 +469,12 @@
       </div>
     </section>
   </aside>
+
+  <!-- Shown while browsing a linked server instead of this one. -->
+  <div id="serverBanner" class="server-banner hidden">
+    <span id="serverBannerText"></span>
+    <button id="serverBannerBack" class="btn-secondary" type="button">Back to this server</button>
+  </div>
 
   <!-- Trailer modal: shared by both Movie Detail and Show Detail's "Watch
        Trailer" button — a YouTube embed over a dimmed backdrop rather than

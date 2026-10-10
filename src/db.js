@@ -350,4 +350,17 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_peer_plays_seen ON peer_plays(last_seen_at);
 `);
 
+// Linked servers, CONSUMING side: other VYZN servers this one can browse.
+// The peer token is stored in plain text (it has to be presented to the
+// other server) and is never sent to a browser.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS linked_servers (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL,
+    url        TEXT NOT NULL,
+    token      TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+`);
+
 module.exports = db;
