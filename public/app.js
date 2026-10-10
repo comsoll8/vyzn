@@ -511,6 +511,15 @@ function focusInDirection(direction) {
     } else {
       bringIntoViewManually(best);
     }
+    // Focusing a control in a detail page's hero (Play, Watchlist, Trailer…)
+    // only scrolls it *just* into view, which on a short TV screen leaves
+    // the title, rating and genres scrolled off the top — and since nothing
+    // focusable sits above the Play button, D-pad Up can never bring them
+    // back. Whenever focus lands in the hero, show the top of the page.
+    if (best.closest('.movie-detail-header')) {
+      const overlay = best.closest('.movie-detail-overlay');
+      if (overlay) overlay.scrollTop = 0;
+    }
   }
 }
 
