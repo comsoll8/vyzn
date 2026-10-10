@@ -1187,8 +1187,7 @@ async function main() {
   // meaningless forever. Rating-filtered for the profile like every shelf.
   const NEW_WINDOW_DAYS = 30;
   const NEW_SHELF_LIMIT = 20;
-  fastify.get('/api/profiles/:profileId/new', async (request) => {
-    const profileId = Number(request.params.profileId);
+  const buildNew = (profileId) => {
     const since = `-${NEW_WINDOW_DAYS} days`;
     const movies = db.prepare(`
       SELECT m.*, p.completed, 'movie' AS kind
@@ -1210,7 +1209,10 @@ async function main() {
       movies: filterByProfile(movies, profileId).slice(0, NEW_SHELF_LIMIT),
       shows: filterByProfile(shows, profileId).slice(0, NEW_SHELF_LIMIT),
     };
-  });
+  };
+  fastify.get('/api/profiles/:profileId/new', async (request) => buildNew(Number(request.params.profileId)));
+  // Same shelves without a profile — what a linked server (peer) sees.
+  fastify.get('/api/peer/new', async () => buildNew(null));
 
   // Removes a profile's playback progress for one item — used both for
   // "Remove from Continue Watching" (just drops the row, nothing else to

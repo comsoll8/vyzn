@@ -324,4 +324,30 @@ db.exec(`
   WHERE media_type IS NULL AND (file_path LIKE '%/Movies/%' OR file_path LIKE '%\\Movies\\%');
 `);
 
+
+// Linked servers (peer sharing). `peer_tokens` is the SHARING side: one row
+// per remote VYZN server allowed to browse/stream this library read-only
+// (only a SHA-256 hash of the token is stored). `peer_plays` is a tiny log
+// of what each peer streamed, so the owner can see "Cupcake is streaming X"
+// without ever learning which profile/person is watching.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS peer_tokens (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    name         TEXT NOT NULL,
+    token_hash   TEXT NOT NULL UNIQUE,
+    created_at   INTEGER NOT NULL,
+    last_used_at INTEGER
+  );
+  CREATE TABLE IF NOT EXISTS peer_plays (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    peer_id      INTEGER NOT NULL,
+    peer_name    TEXT,
+    media_id     INTEGER NOT NULL,
+    title        TEXT,
+    started_at   INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_peer_plays_seen ON peer_plays(last_seen_at);
+`);
+
 module.exports = db;

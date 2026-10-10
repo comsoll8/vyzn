@@ -18,6 +18,7 @@ const fs = require('fs');
 const path = require('path');
 const db = require('./db');
 const activity = require('./activity');
+const peers = require('./peers');
 
 const COOKIE = 'vyzn_auth';
 const DAY = 24 * 60 * 60 * 1000;
@@ -171,6 +172,7 @@ function isPublic(p) {
 const ADMIN_ONLY = [
   ['GET', /^\/api\/settings\/config$/], ['PUT', /^\/api\/settings\/config$/],
   ['*', /^\/api\/tailscale\//],
+  ['*', /^\/api\/peers(\/|$)/],
   ['POST', /^\/api\/scan$/],
   ['POST', /^\/api\/library\/(purge|retry-unmatched|backfill-genres)$/],
   ['DELETE', /^\/api\/library$/], ['POST', /^\/api\/library\/\d+\/rematch$/],
@@ -183,6 +185,9 @@ const isAdminOnly = (method, p) => ADMIN_ONLY.some(([m, re]) => (m === '*' || m 
 function authHook(req, reply, done) {
   const p = req.raw.url.split('?')[0];
   req.user = null;
+  // Linked-server (peer) tokens: a separate, read-only credential.
+  const pr = peers.handle(req, p);
+  if (pr) return pr.ok ? done() : reply.code(pr.status).send({ error: pr.error });
   const tok = tokenFromRequest(req);
   if (tok) req.user = userForToken(tok);
   if (!hasUsers() || isPublic(p)) return done();
@@ -381,6 +386,7 @@ function register(fastify) {
   });
 
   activity.register(fastify, requireAdmin);
+  peers.register(fastify, { requireAdmin, hasUsers, version: require('../package.json').version });
 
   // Reset an account: new password + sign out every device.
   fastify.post('/api/admin/users/:id/reset', async (req, reply) => {
