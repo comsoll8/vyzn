@@ -363,4 +363,21 @@ db.exec(`
   );
 `);
 
+// Watch progress for titles that live on a linked server, per local profile.
+// `item_json` is a snapshot of the title so Continue Watching can draw it
+// without asking the other server (which may be offline).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS remote_progress (
+    profile_id       INTEGER NOT NULL,
+    server_id        INTEGER NOT NULL,
+    media_id         INTEGER NOT NULL,
+    position_seconds REAL,
+    duration_seconds REAL,
+    completed        INTEGER NOT NULL DEFAULT 0,
+    item_json        TEXT,
+    last_watched_at  TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (profile_id, server_id, media_id)
+  );
+`);
+
 module.exports = db;

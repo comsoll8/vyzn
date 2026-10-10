@@ -27,6 +27,13 @@ class NativePlayerBridge(private val context: Context, private val serverBaseUrl
     @JavascriptInterface
     fun supportsAuth(): Boolean = true
 
+    // Lets the web app know this build can play titles that live on a linked
+    // server (it passes remoteServerId, and the player then goes through this
+    // server's /api/remote/:id/... proxy). An older build would ignore that and
+    // play the wrong local item, so the web app only uses it when this exists.
+    @JavascriptInterface
+    fun supportsRemote(): Boolean = true
+
     @JavascriptInterface
     fun play(payloadJson: String) {
         try {
@@ -41,6 +48,7 @@ class NativePlayerBridge(private val context: Context, private val serverBaseUrl
                 putExtra(PlayerActivity.EXTRA_AUTH_COOKIE, CookieManager.getInstance().getCookie(baseUrl) ?: "")
                 putExtra(PlayerActivity.EXTRA_AUTH_TOKEN, payload.optString("authToken", ""))
                 putExtra(PlayerActivity.EXTRA_ITEM_ID, payload.optLong("itemId", -1))
+                putExtra(PlayerActivity.EXTRA_REMOTE_SERVER_ID, payload.optLong("remoteServerId", 0))
                 putExtra(PlayerActivity.EXTRA_PROFILE_ID, payload.optLong("profileId", -1))
                 putExtra(PlayerActivity.EXTRA_RESUME_SECONDS, payload.optDouble("resumeSeconds", 0.0))
                 putExtra(PlayerActivity.EXTRA_DURATION_SECONDS, payload.optDouble("durationSeconds", 0.0))

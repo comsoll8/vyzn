@@ -82,6 +82,9 @@ class PlayerActivity : AppCompatActivity() {
     // reliable than the WebView cookie store, so both are sent.
     private var authToken: String = ""
     private var itemId: Long = -1
+    // > 0 when the title lives on a linked server: everything then goes through
+    // this server's /api/remote/<id>/... proxy and progress is kept here.
+    private var remoteServerId: Long = 0
     private var profileId: Long = -1
     private var resumeSeconds: Double = 0.0
     private var knownDurationSeconds: Double = 0.0
@@ -120,6 +123,7 @@ class PlayerActivity : AppCompatActivity() {
         authCookie = intent.getStringExtra(EXTRA_AUTH_COOKIE) ?: ""
         authToken = intent.getStringExtra(EXTRA_AUTH_TOKEN) ?: ""
         itemId = intent.getLongExtra(EXTRA_ITEM_ID, -1)
+        remoteServerId = intent.getLongExtra(EXTRA_REMOTE_SERVER_ID, 0)
         profileId = intent.getLongExtra(EXTRA_PROFILE_ID, -1)
         resumeSeconds = intent.getDoubleExtra(EXTRA_RESUME_SECONDS, 0.0)
         knownDurationSeconds = intent.getDoubleExtra(EXTRA_DURATION_SECONDS, 0.0)
@@ -193,7 +197,7 @@ class PlayerActivity : AppCompatActivity() {
         // <video> element under its own controls overlay.
         playerView.setKeepContentOnPlayerReset(true)
 
-        val rawUrl = "$serverBaseUrl/api/raw/$itemId"
+        val rawUrl = "$serverBaseUrl${apiPrefix()}/raw/$itemId"
         val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(rawUrl))
         if (subtitle != null) {
             val subtitleConfig = MediaItem.SubtitleConfiguration.Builder(Uri.parse(subtitle.url))
@@ -319,9 +323,9 @@ class PlayerActivity : AppCompatActivity() {
         var connection: HttpURLConnection? = null
         try {
             val url = if (profile > 0) {
-                URL("$base/api/playback/$mediaId/next?profile_id=$profile")
+                URL("$base${apiPrefix()}/playback/$mediaId/next?profile_id=$profile")
             } else {
-                URL("$base/api/playback/$mediaId/next")
+                URL("$base${apiPrefix()}/playback/$mediaId/next")
             }
             connection = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
@@ -498,7 +502,9 @@ class PlayerActivity : AppCompatActivity() {
     private fun postProgress(base: String, profile: Long, id: Long, position: Double, duration: Double) {
         var connection: HttpURLConnection? = null
         try {
-            val url = URL("$base/api/profiles/$profile/progress")
+            val remoteId = remoteServerId
+            val url = if (remoteId > 0) URL("$base/api/profiles/$profile/remote-progress")
+                      else URL("$base/api/profiles/$profile/progress")
             connection = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 doOutput = true
@@ -508,6 +514,7 @@ class PlayerActivity : AppCompatActivity() {
                 applyAuth(this)
             }
             val body = JSONObject().apply {
+                if (remoteId > 0) put("server_id", remoteId)
                 put("media_id", id)
                 put("position_seconds", position)
                 put("duration_seconds", duration)
@@ -531,10 +538,13 @@ class PlayerActivity : AppCompatActivity() {
     // Null language/url fields, a network failure, or non-200 response all
     // just mean "play without subtitles" — never worth failing playback
     // over, same as a dropped progress report elsewhere in this class.
+    // "/api" for this server's own library, "/api/remote/<id>" for a linked one.
+    private fun apiPrefix(): String = if (remoteServerId > 0) "/api/remote/$remoteServerId" else "/api"
+
     private fun fetchSubtitleInfo(base: String, id: Long): SubtitleInfo? {
         var connection: HttpURLConnection? = null
         try {
-            val url = URL("$base/api/raw/$id/subtitles")
+            val url = URL("$base${apiPrefix()}/raw/$id/subtitles")
             connection = (url.openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = 5000
@@ -617,6 +627,7 @@ class PlayerActivity : AppCompatActivity() {
 
         const val EXTRA_SERVER_BASE_URL = "server_base_url"
         const val EXTRA_ITEM_ID = "item_id"
+        const val EXTRA_REMOTE_SERVER_ID = "remote_server_id"
         const val EXTRA_PROFILE_ID = "profile_id"
         const val EXTRA_RESUME_SECONDS = "resume_seconds"
         const val EXTRA_DURATION_SECONDS = "duration_seconds"

@@ -31,6 +31,7 @@ const ALLOWED = [
   /^\/api\/genres\/\d+\/media$/,
   /^\/api\/stream\/\d+$/,
   /^\/api\/raw\/\d+(\/subtitles)?$/,
+  /^\/api\/playback\/\d+\/next$/,
   /^\/stream-files\//,
 ];
 const isAllowed = (method, p) => method === 'GET' && ALLOWED.some((re) => re.test(p));

@@ -34,6 +34,31 @@ async function callPeer(server, pathAndQuery, { timeoutMs = 15000 } = {}) {
   });
 }
 
+// Lay this profile's saved progress (kept on THIS server) over what the other
+// server returned, so Resume / progress bars / watched ticks work.
+function overlayProgress(body, remotePath, profileId, serverId) {
+  const prog = new Map(db.prepare(
+    'SELECT media_id, position_seconds, duration_seconds, completed FROM remote_progress WHERE profile_id = ? AND server_id = ?'
+  ).all(profileId, serverId).map((r) => [r.media_id, r]));
+  if (prog.size === 0) return body;
+  const mark = (row, id) => {
+    const p = prog.get(id);
+    if (p) { row.position_seconds = p.position_seconds; row.duration_seconds = p.duration_seconds; row.completed = p.completed; }
+  };
+  if (Array.isArray(body)) {
+    for (const r of body) if (r && r.media_type) mark(r, r.id);
+  } else if (body && typeof body === 'object') {
+    if (Array.isArray(body.movies)) for (const r of body.movies) mark(r, r.id);
+    if (Array.isArray(body.seasons)) {
+      for (const se of body.seasons) for (const ep of se.episodes || []) mark(ep, ep.media_id);
+    } else if (/^\/api\/library\/\d+\/details$/.test(remotePath)) {
+      const p = prog.get(body.id);
+      body.progress = p ? { position_seconds: p.position_seconds, duration_seconds: p.duration_seconds, completed: p.completed } : null;
+    }
+  }
+  return body;
+}
+
 function register(fastify, { filterByProfile, hasUsers }) {
   const adminOnly = (req, reply) => {
     if (!hasUsers()) return true;
@@ -77,6 +102,7 @@ function register(fastify, { filterByProfile, hasUsers }) {
   fastify.delete('/api/linked-servers/:id', async (req, reply) => {
     if (!adminOnly(req, reply)) return;
     db.prepare('DELETE FROM linked_servers WHERE id = ?').run(Number(req.params.id));
+    db.prepare('DELETE FROM remote_progress WHERE server_id = ?').run(Number(req.params.id));
     for (const k of cache.keys()) if (k.startsWith(`${Number(req.params.id)}|`)) cache.delete(k);
     return { ok: true };
   });
@@ -107,20 +133,16 @@ function register(fastify, { filterByProfile, hasUsers }) {
     return { ...body, playlistUrl: rewrite(body.playlistUrl), subtitleUrl: rewrite(body.subtitleUrl) };
   });
 
-  // Pipe the other server's HLS playlist/segments/subtitles through,
-  // forwarding Range so seeking works.
-  fastify.get('/api/remote/:id/files/*', async (req, reply) => {
-    const server = get(req.params.id);
-    if (!server) return reply.code(404).send({ error: 'No such linked server.' });
-    const rel = String(req.params['*'] || '');
-    if (!rel || rel.split('/').some((seg) => seg === '..' || seg === '')) return reply.code(400).send({ error: 'bad_path' });
+  // Pipe a file from the other server through (HLS playlist/segments,
+  // subtitles, or the original media file), forwarding Range so seeking works.
+  async function pipeFromPeer(server, upstreamPath, req, reply) {
     const ac = new AbortController();
     req.raw.on('close', () => ac.abort());
     let up;
     try {
       const headers = { Authorization: `Bearer ${server.token}`, 'User-Agent': 'vyzn-linked' };
       if (req.headers.range) headers.Range = req.headers.range;
-      up = await fetch(`${server.url}/stream-files/${rel.split('/').map(encodeURIComponent).join('/')}`, { headers, signal: ac.signal });
+      up = await fetch(`${server.url}${upstreamPath}`, { headers, signal: ac.signal });
     } catch {
       return reply.code(502).send({ error: 'server_unreachable' });
     }
@@ -131,6 +153,89 @@ function register(fastify, { filterByProfile, hasUsers }) {
     }
     if (!up.body) return reply.send();
     return reply.send(Readable.fromWeb(up.body));
+  }
+
+  fastify.get('/api/remote/:id/files/*', async (req, reply) => {
+    const server = get(req.params.id);
+    if (!server) return reply.code(404).send({ error: 'No such linked server.' });
+    const rel = String(req.params['*'] || '');
+    if (!rel || rel.split('/').some((seg) => seg === '..' || seg === '')) return reply.code(400).send({ error: 'bad_path' });
+    return pipeFromPeer(server, `/stream-files/${rel.split('/').map(encodeURIComponent).join('/')}`, req, reply);
+  });
+
+  // The original file, byte-for-byte (the Android TV native player's route).
+  fastify.get('/api/remote/:id/raw/:mediaId', async (req, reply) => {
+    const server = get(req.params.id);
+    if (!server) return reply.code(404).send({ error: 'No such linked server.' });
+    if (!/^\d+$/.test(String(req.params.mediaId))) return reply.code(400).send({ error: 'bad_media_id' });
+    return pipeFromPeer(server, `/api/raw/${req.params.mediaId}`, req, reply);
+  });
+
+  fastify.get('/api/remote/:id/raw/:mediaId/subtitles', async (req, reply) => {
+    const server = get(req.params.id);
+    if (!server) return reply.code(404).send({ error: 'No such linked server.' });
+    if (!/^\d+$/.test(String(req.params.mediaId))) return reply.code(400).send({ error: 'bad_media_id' });
+    let res;
+    try { res = await callPeer(server, `/api/raw/${req.params.mediaId}/subtitles`, { timeoutMs: 15000 }); }
+    catch { return reply.code(502).send({ error: 'server_unreachable' }); }
+    if (!res.ok) return reply.code(res.status === 401 ? 502 : res.status).send({ error: 'remote_error' });
+    const body = await res.json().catch(() => null);
+    if (!body) return reply.code(502).send({ error: 'remote_error' });
+    const u = body.subtitleUrl;
+    return { ...body, subtitleUrl: typeof u === 'string' && u.startsWith('/stream-files/') ? `/api/remote/${server.id}/files/${u.slice('/stream-files/'.length)}` : u };
+  });
+
+  // --- Progress for titles that live on a linked server ------------------
+  fastify.post('/api/profiles/:profileId/remote-progress', async (req, reply) => {
+    const profileId = Number(req.params.profileId);
+    const { server_id: serverId, media_id: mediaId, position_seconds: position, duration_seconds: duration, item } = req.body || {};
+    if (!get(serverId) || !Number.isInteger(Number(mediaId)) || position === undefined || !(duration > 0)) {
+      return reply.code(400).send({ error: 'Provide {"server_id","media_id","position_seconds","duration_seconds"}' });
+    }
+    const completed = position / duration >= 0.9 ? 1 : 0;
+    let itemJson = null;
+    if (item && typeof item === 'object') {
+      const j = JSON.stringify(item);
+      if (j.length <= 30000) itemJson = j;
+    }
+    db.prepare(`
+      INSERT INTO remote_progress (profile_id, server_id, media_id, position_seconds, duration_seconds, completed, item_json, last_watched_at)
+      VALUES (@profileId, @serverId, @mediaId, @position, @duration, @completed, @itemJson, datetime('now'))
+      ON CONFLICT(profile_id, server_id, media_id) DO UPDATE SET
+        position_seconds = excluded.position_seconds,
+        duration_seconds = excluded.duration_seconds,
+        completed = excluded.completed,
+        item_json = COALESCE(excluded.item_json, item_json),
+        last_watched_at = datetime('now')
+    `).run({ profileId, serverId: Number(serverId), mediaId: Number(mediaId), position, duration, completed, itemJson });
+    return { ok: true, completed: Boolean(completed) };
+  });
+
+  fastify.delete('/api/profiles/:profileId/remote-progress/:serverId/:mediaId', async (req) => {
+    db.prepare('DELETE FROM remote_progress WHERE profile_id = ? AND server_id = ? AND media_id = ?')
+      .run(Number(req.params.profileId), Number(req.params.serverId), Number(req.params.mediaId));
+    return { ok: true };
+  });
+
+  // Continue Watching for one linked server (same 5%-90% rule as local).
+  fastify.get('/api/remote/:id/continue-watching', async (req) => {
+    const profileId = Number(req.query.profile_id);
+    if (!profileId) return [];
+    const rows = db.prepare(`
+      SELECT media_id, position_seconds, duration_seconds, item_json, last_watched_at FROM remote_progress
+      WHERE profile_id = ? AND server_id = ? AND completed = 0 AND item_json IS NOT NULL
+        AND duration_seconds > 0
+        AND (position_seconds * 1.0 / duration_seconds) >= 0.05
+        AND (position_seconds * 1.0 / duration_seconds) < 0.9
+      ORDER BY last_watched_at DESC LIMIT 20`).all(profileId, Number(req.params.id));
+    const items = [];
+    for (const r of rows) {
+      try {
+        items.push({ ...JSON.parse(r.item_json), id: r.media_id, position_seconds: r.position_seconds,
+                     duration_seconds: r.duration_seconds, last_watched_at: r.last_watched_at });
+      } catch { /* skip a corrupt snapshot */ }
+    }
+    return filterByProfile(items, profileId);
   });
 
   // Read-only browse proxy: /api/remote/:id/<anything on the allowlist>
@@ -166,6 +271,7 @@ function register(fastify, { filterByProfile, hasUsers }) {
     // This server's profile limits apply to what it browses elsewhere.
     let body = hit.body;
     if (profileId) {
+      body = overlayProgress(structuredClone(body), remotePath, profileId, server.id);
       if (Array.isArray(body)) body = filterByProfile(body, profileId);
       else if (body && typeof body === 'object') {
         if (Array.isArray(body.movies) || Array.isArray(body.shows)) {

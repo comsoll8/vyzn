@@ -23,6 +23,9 @@ function apiUrl(url) {
   const base = `/api/remote/${state.server.id}`;
   const fresh = url.match(/^\/api\/profiles\/(\d+)\/new$/);
   if (fresh) return `${base}/peer/new?profile_id=${fresh[1]}`;
+  const cont = url.match(/^\/api\/profiles\/(\d+)\/continue-watching$/);
+  if (cont) return `${base}/continue-watching?profile_id=${cont[1]}`;
+  if (url.startsWith('/api/playback/')) return base + url.slice(4);
   if (/^\/api\/(library(?!\/unmatched)|shows|genres)(\/|\?|$)/.test(url)) return base + url.slice(4);
   return url;
 }
@@ -956,14 +959,14 @@ function posterCard(item) {
       {
         label: '↻ Restart from Beginning',
         onClick: async () => {
-          await fetch(`/api/profiles/${state.profile.id}/progress/${item.id}`, { method: 'DELETE' });
+          await deleteProgress(item);
           openPlayer({ ...item, position_seconds: 0 });
         },
       },
       {
         label: '✕ Remove from Continue Watching',
         onClick: async () => {
-          await fetch(`/api/profiles/${state.profile.id}/progress/${item.id}`, { method: 'DELETE' });
+          await deleteProgress(item);
           if (state.tab === 'home') renderHome();
         },
       },
@@ -1065,11 +1068,11 @@ async function renderHome() {
   gridEl.classList.add('hidden');
 
   const profileId = state.profile ? state.profile.id : '';
-  // Personal rows (continue watching, recommendations, trending) are about
-  // this server's own history, so a linked server only gets New + genres.
+  // Recommendations and trending are about this server's own history, so a
+  // linked server only gets Continue Watching (kept here), New and genres.
   const own = profileId && !isRemote();
   const [continueWatching, recommendations, trending, fresh] = await Promise.all([
-    own ? fetchJson(`/api/profiles/${profileId}/continue-watching`) : [],
+    profileId ? fetchJson(`/api/profiles/${profileId}/continue-watching`) : [],
     own ? fetchJson(`/api/profiles/${profileId}/recommendations`) : [],
     own ? fetchJson(`/api/profiles/${profileId}/trending`) : [],
     profileId ? fetchJson(`/api/profiles/${profileId}/new`).catch(() => null) : null,
@@ -2068,11 +2071,7 @@ async function markWatched(item) {
   movieDetailWatchedBtn.disabled = true;
   try {
     const duration = item.duration_sec || 1;
-    await fetch(`/api/profiles/${state.profile.id}/progress`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ media_id: item.id, position_seconds: duration, duration_seconds: duration }),
-    });
+    await writeProgress(item, duration, duration);
     setWatchedButtonState(true);
     movieDetailProgressWrapEl.classList.add('hidden');
     movieDetailPlayBtn.textContent = '▶ Play';
@@ -2095,7 +2094,7 @@ async function unmarkWatched(item) {
   if (!state.profile) return;
   movieDetailWatchedBtn.disabled = true;
   try {
-    await fetch(`/api/profiles/${state.profile.id}/progress/${item.id}`, { method: 'DELETE' });
+    await deleteProgress(item);
     setWatchedButtonState(false);
     movieDetailProgressWrapEl.classList.add('hidden');
     movieDetailPlayBtn.textContent = '▶ Play';
@@ -2204,7 +2203,7 @@ async function openMovieDetail(item, { forceRefresh = false } = {}) {
   movieDetailRestartBtn.onclick = async () => {
     closeMovieDetailMenu();
     if (!state.profile) return;
-    await fetch(`/api/profiles/${state.profile.id}/progress/${item.id}`, { method: 'DELETE' });
+    await deleteProgress(item);
     hideMovieDetailInternal();
     openPlayer({ ...item, position_seconds: 0 });
   };
@@ -2212,7 +2211,7 @@ async function openMovieDetail(item, { forceRefresh = false } = {}) {
   movieDetailRemoveProgressBtn.onclick = async () => {
     closeMovieDetailMenu();
     if (!state.profile) return;
-    await fetch(`/api/profiles/${state.profile.id}/progress/${item.id}`, { method: 'DELETE' });
+    await deleteProgress(item);
     // No more progress to resume/restart/remove — drop back to a plain
     // "Play" button and hide these two menu items until a new watch
     // session gives the item progress again.
@@ -2361,7 +2360,7 @@ window.addEventListener('resize', closeMovieDetailMenu);
 // local state for) an item that actually lives on the other server.
 function applyRemoteDetailMode() {
   const remote = isRemote();
-  for (const el of [movieDetailEditMatchBtn, movieDetailWatchedBtn, movieDetailWatchlistBtn,
+  for (const el of [movieDetailEditMatchBtn, movieDetailWatchlistBtn,
                     showDetailWatchlistBtn, showDetailFilesBtn]) {
     if (el) el.classList.toggle('remote-hidden', remote);
   }
@@ -2535,6 +2534,39 @@ async function loadLibrary() {
   render();
 }
 
+// Progress for whatever is playing/open: local titles go to this server's
+// own history, titles from a linked server to remote_progress (keyed by
+// server + their media id, with a snapshot so Continue Watching can draw it).
+function snapshotForRemote(item) {
+  const copy = { ...item };
+  delete copy._remote; delete copy.audio_tracks_parsed; delete copy.position_seconds;
+  delete copy.duration_seconds; delete copy.last_watched_at;
+  return copy;
+}
+function writeProgress(item, position, duration) {
+  if (!state.profile) return Promise.resolve();
+  const remote = item._remote || (isRemote() ? state.server.id : null);
+  if (remote) {
+    return fetch(`/api/profiles/${state.profile.id}/remote-progress`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ server_id: remote, media_id: item.id, position_seconds: position, duration_seconds: duration, item: snapshotForRemote(item) }),
+    });
+  }
+  return fetch(`/api/profiles/${state.profile.id}/progress`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ media_id: item.id, position_seconds: position, duration_seconds: duration }),
+  });
+}
+function deleteProgress(item) {
+  if (!state.profile) return Promise.resolve();
+  const remote = item._remote || (isRemote() ? state.server.id : null);
+  return fetch(remote
+    ? `/api/profiles/${state.profile.id}/remote-progress/${remote}/${item.id}`
+    : `/api/profiles/${state.profile.id}/progress/${item.id}`, { method: 'DELETE' });
+}
+
 // --- Playback ------------------------------------------------------------
 
 // The real, full duration of what's playing — NOT videoEl.duration.
@@ -2559,16 +2591,7 @@ function getKnownDuration() {
 function reportProgress() {
   const duration = getKnownDuration();
   if (!state.currentItem || !state.profile || !duration) return;
-  if (state.currentItem._remote) return; // it lives on another server — no local history for it yet
-  fetch(`/api/profiles/${state.profile.id}/progress`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      media_id: state.currentItem.id,
-      position_seconds: videoEl.currentTime,
-      duration_seconds: duration,
-    }),
-  }).catch(() => {});
+  writeProgress(state.currentItem, videoEl.currentTime, duration).catch(() => {});
 }
 
 function formatTime(seconds) {
@@ -2811,11 +2834,18 @@ async function openPlayer(item) {
   // login cookie (it reports that via supportsAuth()). Older builds would
   // just get 401s ("ERROR_CODE_IO_BAD_HTTP_STATUS"), so they fall back to the
   // in-page player below until the app is updated.
-  const nativeOk = !item._remote && window.VyznNativePlayer && typeof window.VyznNativePlayer.play === 'function'
+  // Titles from a linked server use the native player only when this app
+  // build knows how to (an older build would play the wrong local item).
+  const nativeOk = (!item._remote || (window.VyznNativePlayer && typeof window.VyznNativePlayer.supportsRemote === 'function')) && window.VyznNativePlayer && typeof window.VyznNativePlayer.play === 'function'
     && (!(window.VyznAuth && window.VyznAuth.authRequired()) || typeof window.VyznNativePlayer.supportsAuth === 'function');
   if (nativeOk) {
+    // The native player reports progress by id only, so leave the server a
+    // snapshot of the title first (what Continue Watching draws from).
+    const knownDuration = item.duration_sec || item.duration_seconds;
+    if (item._remote && knownDuration > 0) writeProgress(item, item.position_seconds || 0, knownDuration).catch(() => {});
     window.VyznNativePlayer.play(JSON.stringify({
       itemId: item.id,
+      remoteServerId: item._remote || 0,
       title: item.tmdb_matched_title || item.title,
       resumeSeconds: item.position_seconds || 0,
       durationSeconds: item.duration_sec || 0,
@@ -2980,7 +3010,6 @@ playerControlsEl.addEventListener('focusin', showPlayerControls);
 async function triggerPostPlayback() {
   if (postPlaybackTriggered || !state.currentItem) return;
   postPlaybackTriggered = true;
-  if (state.currentItem._remote) return; // next-up/recommendations are about this server's own library
 
   const profileId = state.profile ? state.profile.id : '';
   const url = profileId
