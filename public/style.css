@@ -1820,6 +1820,17 @@ body.detail-open { overflow: hidden; }
   max-width: 520px;
 }
 .edit-match-panel.hidden { display: none; }
+.file-info { flex-basis: 100%; margin-bottom: 4px; }
+.file-info-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim); margin-bottom: 4px; }
+.file-info-path, .file-list-row {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px; line-height: 1.5; color: var(--text); word-break: break-all;
+}
+.file-info-meta { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+.file-list-panel { display: block; max-width: 720px; max-height: 280px; overflow-y: auto; }
+.file-list-panel .file-info { margin-bottom: 8px; }
+.file-list-row { padding: 3px 0; border-top: 1px solid rgba(255,255,255,0.06); }
+.file-list-row span { color: var(--text-dim); margin-right: 8px; }
 .edit-match-panel input[type="text"] {
   flex: 1;
   min-width: 160px;

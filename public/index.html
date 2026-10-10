@@ -208,8 +208,14 @@
           <button id="showDetailTrailerBtn" class="btn-icon hidden" type="button" title="Watch Trailer">
             <span class="btn-icon-glyph">🎬</span>
           </button>
+          <button id="showDetailFilesBtn" class="btn-icon" type="button" title="Show file locations" aria-expanded="false">
+            <span class="btn-icon-glyph">✎</span>
+          </button>
           <button id="showDetailThemeToggleBtn" class="btn-secondary theme-toggle-btn" type="button" aria-label="Mute theme music" title="Theme music">🔊</button>
         </div>
+        <!-- Where this show's episodes actually live on disk, so you can tell
+             which files VYZN matched to it (opened by the pencil button). -->
+        <div id="showDetailFilesPanel" class="edit-match-panel file-list-panel hidden"></div>
       </div>
     </div>
 
@@ -526,6 +532,7 @@
              with a corrected title/type when the auto-match on a messy
              filename got it wrong, without needing to go into Settings. -->
         <div id="movieDetailEditMatchPanel" class="edit-match-panel hidden">
+          <div id="movieDetailFileInfo" class="file-info"></div>
           <input id="movieDetailEditMatchTitle" type="text" placeholder="Search title..." />
           <select id="movieDetailEditMatchType">
             <option value="movie">Movie</option>

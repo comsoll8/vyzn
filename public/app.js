@@ -142,6 +142,9 @@ const showDetailOverviewEl = document.getElementById('showDetailOverview');
 const showDetailCreatorsEl = document.getElementById('showDetailCreators');
 const showDetailPlayBtn = document.getElementById('showDetailPlayBtn');
 const showDetailThemeToggleBtn = document.getElementById('showDetailThemeToggleBtn');
+const showDetailFilesBtn = document.getElementById('showDetailFilesBtn');
+const showDetailFilesPanel = document.getElementById('showDetailFilesPanel');
+const movieDetailFileInfoEl = document.getElementById('movieDetailFileInfo');
 const showDetailWatchlistBtn = document.getElementById('showDetailWatchlistBtn');
 const showDetailTrailerBtn = document.getElementById('showDetailTrailerBtn');
 const showDetailTmdbScoreEl = document.getElementById('showDetailTmdbScore');
@@ -1759,6 +1762,8 @@ async function openShowDetail(showId) {
   state.currentShowDetail = show;
 
   showDetailEl.scrollTop = 0;
+  showDetailFilesPanel.classList.add('hidden');
+  showDetailFilesBtn.setAttribute('aria-expanded', 'false');
   showDetailTitleEl.textContent = show.title;
   showDetailBackdropEl.style.backgroundImage = show.backdrop_url ? `url(${show.backdrop_url})` : 'none';
   showDetailOverviewEl.textContent = show.overview || '';
@@ -2157,6 +2162,7 @@ async function openMovieDetail(item, { forceRefresh = false } = {}) {
   movieDetailEditMatchStatusEl.className = 'unmatched-status';
   movieDetailEditMatchTitleEl.value = item.tmdb_matched_title || item.title;
   movieDetailEditMatchTypeEl.value = item.media_type === 'tv' ? 'tv' : 'movie';
+  renderFileInfo(movieDetailFileInfoEl, item);
 
   movieDetailPlayBtn.onclick = () => { hideMovieDetailInternal(); openPlayer(item); };
   movieDetailWatchedBtn.onclick = () => {
@@ -2323,6 +2329,84 @@ function closeMovieDetailMenu() {
 // the button, and re-close on resize/rotate for the same reason.
 movieDetailEl.addEventListener('scroll', closeMovieDetailMenu);
 window.addEventListener('resize', closeMovieDetailMenu);
+
+// --- File location info (so you can tell which actual file a title is) ----
+function formatFileSize(bytes) {
+  if (!bytes || bytes <= 0) return '';
+  const gb = bytes / 1024 ** 3;
+  return gb >= 1 ? `${gb.toFixed(2)} GB` : `${(bytes / 1024 ** 2).toFixed(0)} MB`;
+}
+
+// Fills `el` with the item's full file path plus a one-line summary of the
+// file itself (resolution, codec, size, length).
+function renderFileInfo(el, item) {
+  el.innerHTML = '';
+  const label = document.createElement('div');
+  label.className = 'file-info-label';
+  label.textContent = 'File';
+  const pathEl = document.createElement('div');
+  pathEl.className = 'file-info-path';
+  pathEl.textContent = item.file_path || 'Unknown';
+  el.appendChild(label);
+  el.appendChild(pathEl);
+  const bits = [item.resolution, item.codec, formatFileSize(item.file_size), formatRuntime(item.duration_sec)].filter(Boolean);
+  if (bits.length) {
+    const meta = document.createElement('div');
+    meta.className = 'file-info-meta';
+    meta.textContent = bits.join(' · ');
+    el.appendChild(meta);
+  }
+}
+
+// TV show: the folder the episodes share, then every episode file under it.
+function renderShowFiles(show) {
+  const panel = showDetailFilesPanel;
+  panel.innerHTML = '';
+  const eps = [];
+  for (const season of show.seasons || []) {
+    for (const ep of season.episodes || []) {
+      if (ep.file_path) eps.push({ season, ep });
+    }
+  }
+  const dirOf = (p) => p.slice(0, p.lastIndexOf('/'));
+  let common = eps.length ? dirOf(eps[0].ep.file_path).split('/') : [];
+  for (const { ep } of eps) {
+    const parts = dirOf(ep.file_path).split('/');
+    let i = 0;
+    while (i < common.length && i < parts.length && common[i] === parts[i]) i++;
+    common = common.slice(0, i);
+  }
+  const commonDir = common.join('/');
+
+  const head = document.createElement('div');
+  head.className = 'file-info';
+  const label = document.createElement('div');
+  label.className = 'file-info-label';
+  label.textContent = 'Location';
+  const pathEl = document.createElement('div');
+  pathEl.className = 'file-info-path';
+  pathEl.textContent = commonDir || (eps.length ? '/' : 'No episode files indexed');
+  head.appendChild(label);
+  head.appendChild(pathEl);
+  panel.appendChild(head);
+
+  for (const { season, ep } of eps) {
+    const row = document.createElement('div');
+    row.className = 'file-list-row';
+    const tag = document.createElement('span');
+    tag.textContent = `S${season.season_number}E${ep.episode_number}`;
+    row.appendChild(tag);
+    row.appendChild(document.createTextNode(commonDir ? ep.file_path.slice(commonDir.length + 1) : ep.file_path));
+    panel.appendChild(row);
+  }
+}
+
+showDetailFilesBtn.addEventListener('click', () => {
+  const willShow = showDetailFilesPanel.classList.contains('hidden');
+  if (willShow && state.currentShowDetail) renderShowFiles(state.currentShowDetail);
+  showDetailFilesPanel.classList.toggle('hidden', !willShow);
+  showDetailFilesBtn.setAttribute('aria-expanded', String(willShow));
+});
 
 // --- Movie detail: "Edit Match" (fix an incorrect TMDB match in place) ---
 
