@@ -2722,10 +2722,24 @@ select:focus-visible,
 .tab-btn { background: rgba(255,255,255,.06); border: 1px solid transparent; color: var(--text); padding: 8px 18px; font-size: 14px; }
 .tab-btn:hover:not(.active) { background: rgba(255,255,255,.12); color: var(--text); border-color: transparent; }
 .tab-btn:focus-visible { outline: none; border-color: #00e5ff; }
-#search { flex: 0 1 220px; min-width: 120px; }
+/* Search: just a magnifier until opened (see searchWrap in index.html). */
+.search-wrap { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.search-btn {
+  width: 38px; height: 38px; padding: 0; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,.06); border: 1px solid transparent; color: var(--text);
+}
+.search-btn:hover { background: rgba(255,255,255,.12); }
+.search-btn:focus-visible { outline: none; border-color: #00e5ff; }
+.search-wrap.open .search-btn { background: rgba(255,255,255,.12); }
+.search-wrap:not(.open) #search { display: none; }
+#search { flex: 0 1 240px; width: 240px; min-width: 120px; }
+.search-wrap.open #search { animation: searchOpen .18s var(--ease); }
+@keyframes searchOpen { from { width: 40px; opacity: 0; } to { width: 240px; opacity: 1; } }
 @media (max-width: 640px) {
   .top-tabs { order: 5; width: 100%; margin-left: 0; }
-  #search { flex: 1 1 120px; }
+  .search-wrap.open { flex: 1 1 120px; }
+  #search { flex: 1 1 120px; width: auto; }
 }
 
 /* ---- Control Center spacing ---- */

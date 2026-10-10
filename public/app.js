@@ -3293,6 +3293,56 @@ document.querySelectorAll('.tab-btn[data-tab]').forEach((btn) => {
   });
 });
 
+// --- Search: collapsed to a magnifier, opens on click / OK -----------------
+const searchWrapEl = document.getElementById('searchWrap');
+const searchBtnEl = document.getElementById('searchBtn');
+function openSearch() {
+  searchWrapEl.classList.add('open');
+  searchBtnEl.setAttribute('aria-expanded', 'true');
+  searchEl.focus();
+}
+function closeSearch() {
+  searchWrapEl.classList.remove('open');
+  searchBtnEl.setAttribute('aria-expanded', 'false');
+}
+function clearSearch() {
+  if (!searchEl.value && !state.query) return;
+  searchEl.value = '';
+  state.query = '';
+  render();
+}
+searchBtnEl.addEventListener('click', () => {
+  if (searchWrapEl.classList.contains('open') && !searchEl.value) closeSearch();
+  else openSearch();
+});
+// Collapse again once focus leaves an empty field (a typed query keeps it open).
+searchEl.addEventListener('blur', (e) => {
+  if (!searchEl.value && e.relatedTarget !== searchBtnEl) closeSearch();
+});
+// The global D-pad handler ignores arrows while typing, so give the field its
+// own way out: Up/Down always leave it, Left/Right only at the text's edges.
+searchEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    clearSearch();
+    closeSearch();
+    searchBtnEl.focus();
+  } else if (e.key === 'Enter' || e.key === 'ArrowDown') {
+    e.preventDefault();
+    focusInDirection('down');
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    focusInDirection('up');
+  } else if (e.key === 'ArrowLeft' && searchEl.selectionStart === 0 && searchEl.selectionEnd === 0) {
+    e.preventDefault();
+    focusInDirection('left');
+  } else if (e.key === 'ArrowRight' && searchEl.selectionStart === searchEl.value.length) {
+    e.preventDefault();
+    focusInDirection('right');
+  }
+});
+
 let searchDebounce;
 searchEl.addEventListener('input', () => {
   clearTimeout(searchDebounce);
