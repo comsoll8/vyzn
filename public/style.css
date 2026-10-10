@@ -1496,50 +1496,76 @@ body.detail-open { overflow: hidden; }
 }
 .season-tab-btn.active { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); font-weight: 700; }
 
-.episode-list { display: flex; flex-direction: column; gap: 10px; }
+.episode-list { display: flex; flex-direction: column; gap: 6px; }
 
 .episode-row {
   display: flex;
-  gap: 14px;
-  padding: 8px;
-  border-radius: 8px;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 16px;
+  border-radius: 12px;
   cursor: pointer;
+  background: rgba(255, 255, 255, 0.03);
   transition: background 0.12s var(--ease);
 }
-.episode-row:hover { background: #333333; }
+.episode-row:hover { background: rgba(255, 255, 255, 0.08); }
 
+.episode-num {
+  flex: 0 0 32px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+/* Explicit 16:9 size, NOT the padding-bottom-percentage trick used for
+   posters: percentage padding is measured against the *containing block's*
+   width, and here the containing block is the whole (flex) row, so the
+   thumbnail used to stretch ~half a screen tall. A fixed width and height
+   is also safe on Android TV WebViews that lack aspect-ratio. */
 .episode-thumb {
   position: relative;
-  flex: 0 0 160px;
-  width: 160px;
-  /* See .card .poster-wrap for why this is the padding-percentage trick
-     instead of aspect-ratio: not supported by some Android TV WebView
-     builds, which silently collapses the box instead of reserving 16:9
-     of space. */
-  height: 0;
-  padding-bottom: 56.25%; /* 9/16 */
+  flex: 0 0 200px;
+  width: 200px;
+  height: 112px;
   background: #232323;
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
 }
 .episode-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.episode-thumb::after {
+  content: '▶';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transition: opacity 0.12s var(--ease);
+}
+.episode-row:hover .episode-thumb::after,
+.episode-row:focus .episode-thumb::after { opacity: 1; }
 
 .episode-meta { flex: 1; min-width: 0; }
 .episode-title-row {
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  margin: 0 0 4px;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 6px;
 }
-.episode-title { margin: 0; font-size: 14px; font-weight: 600; }
-.episode-runtime { font-size: 12px; color: var(--text-dim); flex-shrink: 0; }
+.episode-title { margin: 0; font-size: 16px; font-weight: 600; }
+.episode-runtime { font-size: 13px; color: var(--text-dim); flex-shrink: 0; }
 .episode-overview {
   margin: 0;
   font-size: 13px;
   color: var(--text-dim);
-  line-height: 1.4;
+  line-height: 1.5;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -2523,8 +2549,12 @@ select:focus-visible,
   .grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 12px; padding: 14px; }
 
   .show-detail-body { padding: 0 18px 8px; }
-  .episode-thumb { flex-basis: 100px; width: 100px; }
-  .episode-title-row { flex-wrap: wrap; gap: 4px; }
+  .episode-row { gap: 12px; padding: 10px; }
+  .episode-num { display: none; }
+  .episode-thumb { flex-basis: 112px; width: 112px; height: 63px; }
+  .episode-title { font-size: 14px; }
+  .episode-title-row { flex-wrap: wrap; gap: 2px 8px; }
+  .episode-overview { -webkit-line-clamp: 2; }
 
   /* Settings is still the only thing using this centered-dialog pattern
      (Show Detail moved to the full-page .movie-detail-overlay layout

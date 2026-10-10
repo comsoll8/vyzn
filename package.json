@@ -1,6 +1,6 @@
 {
   "name": "vyzn",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "description": "VYZN — self-hosted media server for Unraid: scans a media library, serves metadata, and streams video via HLS.",
   "main": "src/server.js",
   "type": "commonjs",

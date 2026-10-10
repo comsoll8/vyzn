@@ -1615,8 +1615,10 @@ function episodeRow(ep) {
   titleRow.className = 'episode-title-row';
   const title = document.createElement('p');
   title.className = 'episode-title';
-  const epNum = String(ep.episode_number).padStart(2, '0');
-  title.textContent = `E${epNum} • ${ep.title || 'Episode ' + ep.episode_number}`;
+  title.textContent = ep.title || `Episode ${ep.episode_number}`;
+  const numEl = document.createElement('div');
+  numEl.className = 'episode-num';
+  numEl.textContent = String(ep.episode_number);
   titleRow.appendChild(title);
   const runtime = formatRuntime(ep.duration_sec);
   if (runtime) {
@@ -1631,6 +1633,7 @@ function episodeRow(ep) {
   meta.appendChild(titleRow);
   meta.appendChild(overview);
 
+  row.appendChild(numEl);
   row.appendChild(thumb);
   row.appendChild(meta);
   return row;
