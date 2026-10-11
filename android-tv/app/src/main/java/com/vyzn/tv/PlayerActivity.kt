@@ -5,6 +5,8 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.Build
+import android.provider.Settings
 import android.graphics.BitmapFactory
 import android.util.Log
 import android.view.KeyEvent
@@ -85,6 +87,14 @@ class PlayerActivity : AppCompatActivity() {
     // > 0 when the title lives on a linked server: everything then goes through
     // this server's /api/remote/<id>/... proxy and progress is kept here.
     private var remoteServerId: Long = 0
+    // "Now playing" (see src/nowplaying.js): this player reports its state to the
+    // server every few seconds and long-polls for commands sent from another
+    // device on the account (pause/play/seek/stop from a phone).
+    private val sessionId: String = java.util.UUID.randomUUID().toString()
+    private var currentTitle: String = ""
+    private var sessionRunnable: Runnable? = null
+    @Volatile private var commandsActive: Boolean = false
+    private var commandThread: Thread? = null
     private var profileId: Long = -1
     private var resumeSeconds: Double = 0.0
     private var knownDurationSeconds: Double = 0.0
@@ -128,6 +138,7 @@ class PlayerActivity : AppCompatActivity() {
         resumeSeconds = intent.getDoubleExtra(EXTRA_RESUME_SECONDS, 0.0)
         knownDurationSeconds = intent.getDoubleExtra(EXTRA_DURATION_SECONDS, 0.0)
         val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
+        currentTitle = title
 
         if (serverBaseUrl.isEmpty() || itemId <= 0) {
             Toast.makeText(this, "Couldn't start playback (missing stream info).", Toast.LENGTH_LONG).show()
@@ -235,6 +246,12 @@ class PlayerActivity : AppCompatActivity() {
                 finish()
             }
 
+            // Tell the server straight away on pause/resume so a phone's card
+            // doesn't lag behind by up to a reporting interval.
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                postSessionOnce()
+            }
+
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY && knownDurationSeconds <= 0.0) {
                     // Fall back to ExoPlayer's own duration if the web app
@@ -264,6 +281,7 @@ class PlayerActivity : AppCompatActivity() {
         postPlaybackTriggered = false
         startProgressReporting()
         startPostPlaybackWatcher()
+        startSessionReporting()
     }
 
     // --- "Up Next" episode auto-advance -------------------------------------
@@ -422,6 +440,7 @@ class PlayerActivity : AppCompatActivity() {
         reportProgressOnce()
 
         itemId = episode.mediaId
+        currentTitle = "" // let the server describe the new episode
         resumeSeconds = 0.0
         knownDurationSeconds = episode.durationSeconds
         val label = "S${episode.seasonNumber}:E${episode.episodeNumber}"
@@ -482,6 +501,156 @@ class PlayerActivity : AppCompatActivity() {
     private fun stopProgressReporting() {
         progressRunnable?.let { mainHandler.removeCallbacks(it) }
         progressRunnable = null
+    }
+
+    // --- Now playing: state reports + remote commands ----------------------
+
+    private fun deviceName(): String {
+        val name = try { Settings.Global.getString(contentResolver, "device_name") } catch (e: Exception) { null }
+        return if (!name.isNullOrBlank()) name else Build.MODEL
+    }
+
+    private fun startSessionReporting() {
+        sessionRunnable?.let { mainHandler.removeCallbacks(it) }
+        val r = object : Runnable {
+            override fun run() {
+                postSessionOnce()
+                mainHandler.postDelayed(this, SESSION_INTERVAL_MS)
+            }
+        }
+        sessionRunnable = r
+        mainHandler.post(r)
+        startCommandListener()
+    }
+
+    private fun stopSessionReporting() {
+        sessionRunnable?.let { mainHandler.removeCallbacks(it) }
+        sessionRunnable = null
+        commandsActive = false
+        commandThread?.interrupt()
+        commandThread = null
+    }
+
+    private fun postSessionOnce() {
+        val exoPlayer = player ?: return
+        if (profileId <= 0 || serverBaseUrl.isEmpty()) return
+        val durationSeconds = if (knownDurationSeconds > 0.0) knownDurationSeconds else (if (exoPlayer.duration > 0) exoPlayer.duration / 1000.0 else 0.0)
+        val body = JSONObject().apply {
+            put("session_id", sessionId)
+            put("kind", "native")
+            put("device_name", deviceName())
+            put("media_id", itemId)
+            if (remoteServerId > 0) put("remote_server_id", remoteServerId)
+            if (currentTitle.isNotBlank()) put("title", currentTitle)
+            put("position_seconds", exoPlayer.currentPosition / 1000.0)
+            put("duration_seconds", durationSeconds)
+            put("state", if (exoPlayer.playWhenReady) "playing" else "paused")
+        }
+        val base = serverBaseUrl
+        val profile = profileId
+        try {
+            progressExecutor.execute { postSessionBody(base, profile, body) }
+        } catch (e: Exception) {
+            // Executor already shut down (closing) — nothing to report.
+        }
+    }
+
+    private fun postSessionBody(base: String, profile: Long, body: JSONObject) {
+        var connection: HttpURLConnection? = null
+        try {
+            connection = (URL("$base/api/profiles/$profile/sessions").openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json")
+                connectTimeout = 5000
+                readTimeout = 5000
+                applyAuth(this)
+            }
+            OutputStreamWriter(connection.outputStream).use { it.write(body.toString()) }
+            connection.responseCode
+        } catch (e: Exception) {
+            Log.w(TAG, "Session report failed", e)
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
+    // Long-poll for commands from another device. The server holds each request
+    // open until a command arrives (or ~25s), so a tap on a phone reaches the
+    // player almost instantly. Ends when the session is gone (HTTP 404 once the
+    // player has reported "stopped").
+    private fun startCommandListener() {
+        if (commandsActive || profileId <= 0 || serverBaseUrl.isEmpty()) return
+        commandsActive = true
+        val base = serverBaseUrl
+        val thread = Thread {
+            var after = 0L
+            var misses = 0
+            while (commandsActive) {
+                var connection: HttpURLConnection? = null
+                try {
+                    connection = (URL("$base/api/sessions/$sessionId/commands?after=$after").openConnection() as HttpURLConnection).apply {
+                        requestMethod = "GET"
+                        connectTimeout = 5000
+                        readTimeout = 35000
+                        applyAuth(this)
+                    }
+                    val code = connection.responseCode
+                    if (code == HttpURLConnection.HTTP_NOT_FOUND) {
+                        // Either the first report is still in flight, or the session ended.
+                        if (++misses > 5) break
+                        Thread.sleep(1500)
+                        continue
+                    }
+                    if (code != HttpURLConnection.HTTP_OK) {
+                        Thread.sleep(4000)
+                        continue
+                    }
+                    misses = 0
+                    val text = BufferedReader(InputStreamReader(connection.inputStream)).use { it.readText() }
+                    val json = JSONObject(text)
+                    val cmds = json.optJSONArray("commands")
+                    if (cmds != null) {
+                        for (i in 0 until cmds.length()) {
+                            val c = cmds.getJSONObject(i)
+                            after = maxOf(after, c.optLong("seq"))
+                            val action = c.optString("action")
+                            val delta = c.optDouble("delta", 0.0)
+                            val position = c.optDouble("position", 0.0)
+                            mainHandler.post { applyRemoteCommand(action, delta, position) }
+                        }
+                    }
+                    after = maxOf(after, json.optLong("seq", after))
+                } catch (e: InterruptedException) {
+                    break
+                } catch (e: Exception) {
+                    if (!commandsActive) break
+                    try { Thread.sleep(4000) } catch (ie: InterruptedException) { break }
+                } finally {
+                    connection?.disconnect()
+                }
+            }
+        }
+        thread.isDaemon = true
+        thread.name = "vyzn-commands"
+        commandThread = thread
+        thread.start()
+    }
+
+    private fun applyRemoteCommand(action: String, delta: Double, position: Double) {
+        val p = player ?: return
+        when (action) {
+            "play" -> p.playWhenReady = true
+            "pause" -> p.playWhenReady = false
+            "toggle" -> p.playWhenReady = !p.playWhenReady
+            "seek_rel" -> {
+                val upper = if (p.duration > 0) p.duration else Long.MAX_VALUE
+                p.seekTo((p.currentPosition + (delta * 1000).toLong()).coerceIn(0L, upper))
+            }
+            "seek" -> p.seekTo((position * 1000).toLong().coerceAtLeast(0L))
+            "stop" -> finish()
+        }
+        mainHandler.postDelayed({ postSessionOnce() }, 200)
     }
 
     private fun reportProgressOnce() {
@@ -610,6 +779,15 @@ class PlayerActivity : AppCompatActivity() {
         stopPostPlaybackWatcher()
         countdownRunnable?.let { mainHandler.removeCallbacks(it) }
         reportProgressOnce() // final update on close, mirroring hidePlayerInternal()'s reportProgress() in app.js
+        stopSessionReporting()
+        if (profileId > 0 && serverBaseUrl.isNotEmpty()) {
+            val stopBody = JSONObject().put("session_id", sessionId).put("kind", "native").put("state", "stopped")
+            val base = serverBaseUrl
+            val profile = profileId
+            try {
+                progressExecutor.execute { postSessionBody(base, profile, stopBody) }
+            } catch (e: Exception) { /* executor closed */ }
+        }
         player?.release()
         player = null
         progressExecutor.shutdown()
@@ -624,6 +802,7 @@ class PlayerActivity : AppCompatActivity() {
         private const val UP_NEXT_TRIGGER_SECONDS = 15
         private const val UP_NEXT_COUNTDOWN_SECONDS = 10
         private const val POST_PLAYBACK_POLL_MS = 1000L
+        private const val SESSION_INTERVAL_MS = 4000L
 
         const val EXTRA_SERVER_BASE_URL = "server_base_url"
         const val EXTRA_ITEM_ID = "item_id"
