@@ -2899,6 +2899,7 @@ async function openPlayer(item) {
     await startStreamAndAttach(item, { resumeTime: item.position_seconds || 0, autoplay: true });
     clearInterval(progressTimer);
     progressTimer = setInterval(reportProgress, 15000);
+    if (window.VyznNowPlaying) window.VyznNowPlaying.start();
   } catch (err) {
     console.error(err);
     // A blocking native alert() over a still-open (but blank) player was
@@ -2927,6 +2928,7 @@ function hidePlayerInternal() {
   if (playerEl.classList.contains('hidden')) return; // already closed — avoid double reportProgress etc.
   reportProgress();
   clearInterval(progressTimer);
+  if (window.VyznNowPlaying) window.VyznNowPlaying.stop();
   clearTimeout(controlsHideTimer);
   hideUpNext();
   hideRecommendations();

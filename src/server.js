@@ -58,6 +58,7 @@ const tailscale = require('./tailscale');
 const auth = require('./auth');
 const activity = require('./activity');
 const linked = require('./linked');
+const nowplaying = require('./nowplaying');
 const autoscan = require('./autoscan');
 
 // Plain X.Y.Z numeric comparison for the "Check for Updates" route —
@@ -441,6 +442,7 @@ async function main() {
   });
 
   linked.register(fastify, { filterByProfile, hasUsers: auth.hasUsers });
+  nowplaying.register(fastify, { hasUsers: auth.hasUsers });
 
   fastify.get('/health', async () => ({ status: 'ok' }));
 
