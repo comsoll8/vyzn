@@ -227,6 +227,9 @@ class PlayerActivity : AppCompatActivity() {
         exoPlayer.trackSelectionParameters = exoPlayer.trackSelectionParameters
             .buildUpon()
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+            // Multi-dub files: prefer English instead of whichever track the
+            // file lists first / flags default.
+            .setPreferredAudioLanguages("en", "eng")
             .build()
 
         exoPlayer.addListener(object : Player.Listener {

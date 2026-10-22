@@ -39,8 +39,8 @@ android {
         // testing before you have a TV to side-load onto.
         minSdk = 24
         targetSdk = 34
-        versionCode = 7
-        versionName = "1.5.0"
+        versionCode = 8
+        versionName = "1.5.1"
     }
 
     signingConfigs {

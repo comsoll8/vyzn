@@ -49,7 +49,7 @@ const fastify = require('fastify')({
 
 const db = require('./db');
 const { runScan, enrichUnmatched, backfillGenres, scanEvents, linkMediaGenres } = require('./scanner');
-const { startHlsJob, listActiveJobs, stopJob, extractSubtitlesIfNeeded, startTranscodeCleanup } = require('./streamer');
+const { chooseDefaultAudio, startHlsJob, listActiveJobs, stopJob, extractSubtitlesIfNeeded, startTranscodeCleanup } = require('./streamer');
 const tmdb = require('./tmdb');
 const ratings = require('./ratings');
 const seerr = require('./seerr');
@@ -1640,15 +1640,19 @@ async function main() {
     }
 
     const audioTrackParam = request.query.audio_track;
-    const audioTrackIndex = audioTrackParam !== undefined && audioTrackParam !== '' ? parseInt(audioTrackParam, 10) : undefined;
-    const audioTrackKey = audioTrackIndex === undefined || Number.isNaN(audioTrackIndex) ? 'default' : String(audioTrackIndex);
-
     const audioTracks = item.audio_tracks ? JSON.parse(item.audio_tracks) : [];
+    let audioTrackIndex = audioTrackParam !== undefined && audioTrackParam !== '' ? parseInt(audioTrackParam, 10) : undefined;
+    // Nothing requested: prefer English over ffmpeg's "most channels" pick.
+    if (audioTrackIndex === undefined || Number.isNaN(audioTrackIndex)) {
+      audioTrackIndex = await chooseDefaultAudio(item.file_path, audioTracks);
+    }
+    const audioTrackKey = audioTrackIndex === undefined ? 'default' : String(audioTrackIndex);
+
     const subtitleTracks = item.subtitle_tracks ? JSON.parse(item.subtitle_tracks) : [];
 
     try {
       const hlsPromise = startHlsJob(item.id, item.file_path, {
-        audioTrackIndex: Number.isNaN(audioTrackIndex) ? undefined : audioTrackIndex,
+        audioTrackIndex,
         title: item.tmdb_matched_title || item.title,
       });
       const subtitlePromise = extractSubtitlesIfNeeded(item.id, item.file_path, subtitleTracks);
@@ -1672,6 +1676,7 @@ async function main() {
         playlistUrl: `/stream-files/${item.id}/${audioTrackKey}/index.m3u8`,
         subtitleUrl: subtitlePath ? `/stream-files/${item.id}/subs.vtt` : null,
         audioTracks,
+        audioTrackIndex: audioTrackIndex === undefined ? null : audioTrackIndex,
       };
     } catch (err) {
       fastify.log.error(err, `Failed to start stream for item ${item.id}`);

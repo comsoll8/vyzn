@@ -2613,7 +2613,9 @@ function formatTime(seconds) {
 function pickPreferredAudioIndex(audioTracks) {
   const pref = localStorage.getItem(AUDIO_PREF_KEY);
   if (!pref || !audioTracks || audioTracks.length === 0) return undefined;
-  const match = audioTracks.find((t) => (t.language || '').toLowerCase() === pref.toLowerCase());
+  const eng = (l) => (['en', 'english'].includes(l) ? 'eng' : l);
+  const want = eng(pref.toLowerCase());
+  const match = audioTracks.find((t) => eng((t.language || '').toLowerCase()) === want);
   return match ? match.index : undefined;
 }
 
@@ -2796,7 +2798,7 @@ async function startStreamAndAttach(item, { audioTrackIndex, resumeTime, autopla
     playerSubtitleBtn.classList.add('hidden');
   }
 
-  populateAudioTrackSelect(data.audioTracks, effectiveIndex);
+  populateAudioTrackSelect(data.audioTracks, effectiveIndex !== undefined ? effectiveIndex : (data.audioTrackIndex ?? undefined));
 
   videoEl.addEventListener('loadedmetadata', () => {
     if (resumeTime && resumeTime > 0) videoEl.currentTime = resumeTime;

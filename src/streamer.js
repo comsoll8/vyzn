@@ -30,6 +30,37 @@ function getVaapiDevice() {
 // is the live fluent-ffmpeg handle, killed via stopJob().
 const activeJobs = new Map();
 
+// --- Default audio track ---------------------------------------------------
+// With no explicit ?audio_track, ffmpeg's own pick is "the stream with the
+// most channels" -- which on multi-dub releases (e.g. Bluey) can be a
+// Russian 5.1 track ahead of the English stereo one. So when nothing was
+// asked for, prefer an English track; only if none is identifiable do we
+// fall back to ffmpeg's choice.
+const ENGLISH = new Set(['en', 'eng', 'english', 'en-us', 'en-gb', 'en-au']);
+const probeTitleCache = new Map();
+
+function probeAudioTitles(filePath) {
+  if (probeTitleCache.has(filePath)) return probeTitleCache.get(filePath);
+  const p = new Promise((resolve) => {
+    ffmpeg.ffprobe(filePath, (err, meta) => {
+      if (err || !meta) return resolve([]);
+      resolve(meta.streams.filter((st) => st.codec_type === 'audio').map((st) => (st.tags && (st.tags.title || st.tags.handler_name)) || ''));
+    });
+  });
+  probeTitleCache.set(filePath, p);
+  return p;
+}
+
+async function chooseDefaultAudio(filePath, audioTracks) {
+  if (!audioTracks || audioTracks.length < 2) return undefined;
+  const byLang = audioTracks.find((t) => ENGLISH.has(String(t.language || '').toLowerCase()));
+  if (byLang) return byLang.index;
+  // Untagged or mis-tagged files: look at the track titles ("English 5.1").
+  const titles = await probeAudioTitles(filePath);
+  const i = titles.findIndex((t) => /\beng(lish)?\b/i.test(t));
+  return i >= 0 ? i : undefined;
+}
+
 function jobKey(itemId, audioTrackKey) {
   return `${itemId}:${audioTrackKey}`;
 }
@@ -388,6 +419,7 @@ function startTranscodeCleanup() {
 }
 
 module.exports = {
+  chooseDefaultAudio,
   startTranscodeCleanup,
   sweepTranscodeDir,
   startHlsJob,
