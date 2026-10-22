@@ -465,7 +465,11 @@ async function main() {
     // avatars can be cached for an hour.
     cacheControl: false,
     setHeaders(res, filePath) {
-      res.setHeader('Cache-Control', /\.(html|js|css|json)$/i.test(filePath) ? 'no-cache' : 'public, max-age=3600');
+      // @fastify/static 10 passes the Fastify reply here (older versions
+      // passed the raw response), so support both.
+      const value = /\.(html|js|css|json)$/i.test(filePath) ? 'no-cache' : 'public, max-age=3600';
+      if (typeof res.setHeader === 'function') res.setHeader('Cache-Control', value);
+      else res.header('Cache-Control', value);
     },
   });
 
