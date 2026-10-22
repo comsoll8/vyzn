@@ -1,5 +1,5 @@
 # Lightweight Node.js base
-FROM node:20-alpine
+FROM node:22-alpine
 
 # Install ffmpeg (transcoding), Intel VAAPI drivers for hardware
 # transcoding via QuickSync, tools needed to remap PUID/PGID at runtime,

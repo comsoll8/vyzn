@@ -1,7 +1,7 @@
 {
   "name": "vyzn",
-  "version": "0.10.1",
-  "description": "VYZN — self-hosted media server for Unraid: scans a media library, serves metadata, and streams video via HLS.",
+  "version": "0.11.0",
+  "description": "VYZN \u2014 self-hosted media server for Unraid: scans a media library, serves metadata, and streams video via HLS.",
   "main": "src/server.js",
   "type": "commonjs",
   "scripts": {
@@ -10,16 +10,16 @@
     "scan": "node src/scanner.js"
   },
   "dependencies": {
-    "fastify": "^4.28.1",
-    "@fastify/static": "^7.0.4",
-    "@fastify/cors": "^9.0.1",
+    "fastify": "^5.8.5",
+    "@fastify/static": "^10.1.1",
+    "@fastify/cors": "^11.0.0",
     "better-sqlite3": "^11.3.0",
     "fluent-ffmpeg": "^2.1.3",
     "chokidar": "^3.6.0",
-    "pino-pretty": "^11.2.2",
+    "pino-pretty": "^13.0.0",
     "qrcode": "^1.5.4"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   }
 }

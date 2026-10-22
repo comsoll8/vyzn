@@ -1,3 +1,5 @@
+const escHtml = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 // Frontend: profile picker -> Apple-TV-style home (hero + shelves) with a
 // Movies/TV flat-grid fallback tab, HLS playback via hls.js, and periodic
 // playback-progress reporting so "Continue Watching" works.
@@ -688,7 +690,7 @@ function avatarInner(p) {
   if (p.avatar && /^[a-z0-9-]{2,32}$/.test(p.avatar)) {
     return `<img src="/assets/avatars/${p.avatar}.svg" alt="" class="avatar-img" draggable="false" />`;
   }
-  return (p.avatar || p.name || '?').slice(0, 1).toUpperCase();
+  return escHtml((p.avatar || p.name || '?').slice(0, 1).toUpperCase());
 }
 function hasAvatarImg(p) { return !!(p.avatar && /^[a-z0-9-]{2,32}$/.test(p.avatar)); }
 
@@ -727,7 +729,7 @@ function renderProfileList(profiles) {
   for (const p of profiles) {
     const card = document.createElement('button');
     card.className = 'profile-card';
-    card.innerHTML = `<div class="profile-avatar${hasAvatarImg(p) ? ' has-img' : ''}">${avatarInner(p)}</div><span>${p.name}${p.is_child ? ' 🧒' : ''}</span>`;
+    card.innerHTML = `<div class="profile-avatar${hasAvatarImg(p) ? ' has-img' : ''}">${avatarInner(p)}</div><span>${escHtml(p.name)}${p.is_child ? ' 🧒' : ''}</span>`;
     card.addEventListener('click', () => selectProfile(p));
     profileListEl.appendChild(card);
   }
@@ -3250,7 +3252,7 @@ function ccProfileRow(profile) {
   const row = document.createElement('button');
   row.type = 'button';
   row.className = 'cc-profile-row' + (state.profile && state.profile.id === profile.id ? ' active' : '');
-  row.innerHTML = `<span class="cc-profile-avatar${hasAvatarImg(profile) ? ' has-img' : ''}">${avatarInner(profile)}</span><span>${profile.name}${profile.is_child ? ' 🧒' : ''}</span>`;
+  row.innerHTML = `<span class="cc-profile-avatar${hasAvatarImg(profile) ? ' has-img' : ''}">${avatarInner(profile)}</span><span>${escHtml(profile.name)}${profile.is_child ? ' 🧒' : ''}</span>`;
   row.addEventListener('click', () => switchProfileInstant(profile));
   return row;
 }
@@ -3331,7 +3333,7 @@ ccSystemInfoBtn.addEventListener('click', async () => {
     ['TV episodes indexed', info.counts.episodeCount],
     ['TV shows indexed', info.counts.showCount],
   ];
-  ccSystemInfoEl.innerHTML = rows.map(([label, value]) => `<dt>${label}</dt><dd>${value}</dd>`).join('');
+  ccSystemInfoEl.innerHTML = rows.map(([label, value]) => `<dt>${escHtml(label)}</dt><dd>${escHtml(value)}</dd>`).join('');
 });
 
 // --- App switcher (active transcode sessions, tvOS-multitasking-style) ---
@@ -3858,7 +3860,7 @@ async function loadSettingsSystemInfo() {
     rows.push(['Last scan', `${info.lastScan.status} · ${info.lastScan.files_added ?? 0} items · ${finished}`]);
   }
   settingsSystemInfoEl.innerHTML = rows
-    .map(([label, value]) => `<dt>${label}</dt><dd>${value}</dd>`)
+    .map(([label, value]) => `<dt>${escHtml(label)}</dt><dd>${escHtml(value)}</dd>`)
     .join('');
 }
 
@@ -3880,12 +3882,12 @@ async function loadConfigForm() {
     wrapper.className = 'config-field';
     const sourceNote = field.source === 'env' ? ' (from docker-compose.yml)' : '';
     wrapper.innerHTML = `
-      <span class="config-field-label">${field.label}${sourceNote}</span>
+      <span class="config-field-label">${escHtml(field.label)}${sourceNote}</span>
       ${field.type === 'bool'
-        ? `<input type="checkbox" data-config-key="${key}" ${field.value === 'true' || field.hasValue ? 'checked' : ''} />`
-        : `<input type="${field.secret ? 'password' : 'text'}" data-config-key="${key}" value="${field.value ? field.value.replace(/"/g, '&quot;') : ''}" placeholder="${field.hint || ''}" autocomplete="off" />`
+        ? `<input type="checkbox" data-config-key="${escHtml(key)}" ${field.value === 'true' || field.hasValue ? 'checked' : ''} />`
+        : `<input type="${field.secret ? 'password' : 'text'}" data-config-key="${escHtml(key)}" value="${escHtml(field.value)}" placeholder="${escHtml(field.hint)}" autocomplete="off" />`
       }
-      <span class="config-field-hint">${field.hint || ''}</span>
+      <span class="config-field-hint">${escHtml(field.hint)}</span>
     `;
     configFormEl.appendChild(wrapper);
   }
@@ -3988,7 +3990,7 @@ checkUpdateBtn.addEventListener('click', async () => {
     if (data.error) {
       checkUpdateStatusEl.textContent = `Could not check: ${data.error}`;
     } else if (data.updateAvailable) {
-      checkUpdateStatusEl.innerHTML = `Update available: v${data.current} → v${data.latest}. Run <code>docker compose pull &amp;&amp; docker compose up -d</code> on the server to install it${data.releaseUrl ? ` (<a href="${data.releaseUrl}" target="_blank" rel="noopener">release notes</a>)` : ''}.`;
+      checkUpdateStatusEl.innerHTML = `Update available: v${escHtml(data.current)} → v${escHtml(data.latest)}. Run <code>docker compose pull &amp;&amp; docker compose up -d</code> on the server to install it${data.releaseUrl ? ` (<a href="${/^https:\/\//.test(data.releaseUrl) ? escHtml(data.releaseUrl) : '#'}" target="_blank" rel="noopener">release notes</a>)` : ''}.`;
     } else {
       checkUpdateStatusEl.textContent = `You're up to date (v${data.current}).`;
     }

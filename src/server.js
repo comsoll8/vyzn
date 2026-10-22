@@ -408,11 +408,39 @@ function cleanAvatar(v) {
   return typeof v === 'string' && /^[a-z0-9-]{1,32}$/.test(v) ? v : null;
 }
 
+// LAN, loopback, Tailscale (100.64/10, *.ts.net, MagicDNS short names) and
+// mDNS hosts count as "ours" for CORS.
+function isPrivateHost(h) {
+  h = String(h || '').toLowerCase().replace(/^\[|\]$/g, '');
+  if (h === 'localhost' || h === '::1' || /^fd[0-9a-f]{2}:/.test(h) || /^fe80:/.test(h)) return true;
+  if (/\.(ts\.net|local|lan|home\.arpa)$/.test(h)) return true;
+  if (!h.includes('.') && !h.includes(':')) return true; // bare hostname, e.g. http://cupcake:8080
+  const m = h.match(/^(\d+)\.(\d+)\.\d+\.\d+$/);
+  if (!m) return false;
+  const a = Number(m[1]), b = Number(m[2]);
+  return a === 10 || a === 127 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31) || (a === 100 && b >= 64 && b <= 127);
+}
+
 async function main() {
   clearPoisonedDetailCache();
 
   // credentials:true so the browser keeps sending the vyzn_auth cookie.
-  await fastify.register(cors, { origin: true, credentials: true });
+  // Cross-origin access is limited to this server's own origin plus
+  // LAN / Tailscale / localhost pages, instead of reflecting any website's
+  // origin back with credentials (which would let a malicious page act as
+  // a logged-in user). Same-origin requests and non-browser clients
+  // (the TV app, other VYZN servers) don't depend on CORS at all.
+  await fastify.register(cors, () => (req, cb) => {
+    const origin = req.headers.origin;
+    let ok = false;
+    if (origin) {
+      try {
+        const u = new URL(origin);
+        ok = u.host === req.headers.host || isPrivateHost(u.hostname);
+      } catch { ok = false; }
+    }
+    cb(null, { origin: ok, credentials: true });
+  });
   auth.register(fastify);
 
   // Serve HLS segments/playlists as static files once ffmpeg has written them.

@@ -144,13 +144,26 @@ function listProfiles(userId) {
   try { return db.prepare('SELECT * FROM profiles WHERE user_id = ? ORDER BY id').all(userId); } catch { return []; }
 }
 
+// The path as the router will see it. Fastify percent-decodes the URL
+// before routing (and treats ';' as a query delimiter on v4), so every
+// access check must match against the same decoded form -- otherwise
+// /api/%74ailscale/connect would dodge a check written for
+// /api/tailscale/connect. Returns null for a malformed path.
+function normPath(rawUrl) {
+  let p = String(rawUrl || '').split('?')[0].split('#')[0].split(';')[0];
+  try { p = decodeURIComponent(p); } catch { return null; }
+  p = require('path').posix.normalize(p.replace(/\/{2,}/g, '/'));
+  if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
+  return p.startsWith('/') ? p : null;
+}
+
 // Profile ids a request refers to via /api/profiles/:id/... or ?profile_id=.
 function profileIdsIn(url) {
   const ids = [];
-  const m = url.split('?')[0].match(/^\/api\/profiles\/(\d+)/);
+  const m = (normPath(url) || '').match(/^\/api\/profiles\/(\d+)/);
   if (m) ids.push(Number(m[1]));
-  const q = url.split('?')[1];
-  if (q) { const v = new URLSearchParams(q).get('profile_id'); if (v && /^\d+$/.test(v)) ids.push(Number(v)); }
+  const q = String(url).split('?')[1];
+  if (q) for (const v of new URLSearchParams(q).getAll('profile_id')) if (/^\d+$/.test(v)) ids.push(Number(v));
   return ids;
 }
 
@@ -184,8 +197,9 @@ const ADMIN_ONLY = [
 const isAdminOnly = (method, p) => ADMIN_ONLY.some(([m, re]) => (m === '*' || m === method) && re.test(p));
 
 function authHook(req, reply, done) {
-  const p = req.raw.url.split('?')[0];
+  const p = normPath(req.raw.url);
   req.user = null;
+  if (p === null) return reply.code(400).send({ error: 'bad_request' });
   // Linked-server (peer) tokens: a separate, read-only credential.
   const pr = peers.handle(req, p);
   if (pr) return pr.ok ? done() : reply.code(pr.status).send({ error: pr.error });
@@ -432,4 +446,4 @@ function register(fastify) {
   });
 }
 
-module.exports = { listProfiles, register, hashPassword, verifyPassword, issueToken, userForToken, hasUsers, authHook, invalidateUsers };
+module.exports = { normPath, listProfiles, register, hashPassword, verifyPassword, issueToken, userForToken, hasUsers, authHook, invalidateUsers };

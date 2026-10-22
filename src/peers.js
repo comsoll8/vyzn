@@ -129,7 +129,7 @@ function register(fastify, { requireAdmin, hasUsers, version }) {
   fastify.addHook('preHandler', async (req) => {
     if (!req.peer) return;
     if (req.query && typeof req.query === 'object') delete req.query.profile_id;
-    const m = req.raw.url.split('?')[0].match(/^\/api\/(?:stream|raw)\/(\d+)(?:\/subtitles)?$/);
+    const m = (require('./auth').normPath(req.raw.url) || '').match(/^\/api\/(?:stream|raw)\/(\d+)(?:\/subtitles)?$/);
     if (m) { try { recordPlay(req.peer, Number(m[1])); } catch { /* logging only */ } }
   });
   fastify.addHook('preSerialization', async (req, reply, payload) => (req.peer ? scrub(payload) : payload));
