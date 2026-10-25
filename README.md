@@ -35,6 +35,99 @@ vyzn/
 └── package.json
 ```
 
+## Install with Docker
+
+VYZN ships as a ready-made image, `ghcr.io/comsoll8/vyzn`, so you don't need
+the source code, Node, or ffmpeg on the host. Any Linux machine, NAS or
+Unraid box with Docker works. The image is **x86-64 (amd64) only** for now
+(no ARM / Raspberry Pi / ARM Synology).
+
+### 1. Prepare two folders
+
+- Your **media folder** (it is mounted read-only, VYZN never changes your
+  files). Movies and TV shows should be in subfolders, e.g. `Movies/` and
+  `TvShows/` (see "What gets scanned").
+- A **data folder** for VYZN's database and settings, e.g. `/opt/vyzn`.
+  Create it first: `mkdir -p /opt/vyzn/transcode`
+
+### 2. Run it with Docker Compose (recommended)
+
+Save this as `docker-compose.yml` (or copy `docker-compose.ghcr.yml` from
+this repo) and edit the three marked lines:
+
+```yaml
+services:
+  vyzn:
+    image: ghcr.io/comsoll8/vyzn:latest
+    container_name: vyzn
+    restart: unless-stopped
+    ports:
+      - "18080:8080"                    # web UI on http://<host>:18080
+    environment:
+      - PUID=1000                       # <-- user/group that owns your data folder
+      - PGID=1000                       #     (Unraid: 99 / 100)
+      - TZ=Australia/Adelaide           # <-- your timezone
+      - MEDIA_DIR=/media
+      - DATA_DIR=/config
+      - TRANSCODE_DIR=/transcode
+      - HW_TRANSCODE=false              # true only with an Intel iGPU (see below)
+    volumes:
+      - /opt/vyzn:/config               # <-- your data folder
+      - /path/to/your/media:/media:ro   # <-- your media folder
+      - /opt/vyzn/transcode:/transcode
+```
+
+Then:
+
+```bash
+docker compose up -d
+docker logs vyzn --tail 20        # should end with "Media server listening"
+curl http://localhost:18080/health
+```
+
+### 2b. Or with plain `docker run`
+
+```bash
+docker run -d --name vyzn --restart unless-stopped \
+  -p 18080:8080 \
+  -e PUID=1000 -e PGID=1000 -e TZ=Australia/Adelaide \
+  -e MEDIA_DIR=/media -e DATA_DIR=/config -e TRANSCODE_DIR=/transcode \
+  -v /opt/vyzn:/config \
+  -v /path/to/your/media:/media:ro \
+  -v /opt/vyzn/transcode:/transcode \
+  ghcr.io/comsoll8/vyzn:latest
+```
+
+### 3. First run
+
+1. Open `http://<host>:18080` and create the first account (it becomes the
+   admin).
+2. Go to Control Center > Settings and add your **TMDB API key**
+   (free from themoviedb.org) for posters and descriptions. No restart
+   needed.
+3. Press **Scan** to index your library.
+
+### Optional extras
+
+- **Intel hardware transcoding:** add `devices: ["/dev/dri:/dev/dri"]` and
+  set `HW_TRANSCODE=true` (use `LIBVA_DRIVER_NAME=i965` on pre-Broadwell
+  CPUs). Without it VYZN transcodes on the CPU.
+- **Tailscale remote access:** add `devices: ["/dev/net/tun:/dev/net/tun"]`
+  and `cap_add: ["NET_ADMIN"]`, then connect from Settings.
+- **Pin a version** (e.g. `ghcr.io/comsoll8/vyzn:0.11.2`) instead of
+  `:latest` if you'd rather update on your own schedule.
+
+### Updating
+
+```bash
+cd /opt/vyzn-compose            # the folder holding your docker-compose.yml
+docker compose pull && docker compose up -d --force-recreate
+```
+
+Your library, accounts and settings live in the data folder, so they
+survive updates. New images are published when a `vX.Y.Z` release tag is
+pushed (see "Versioned releases & GitHub Container Registry").
+
 ## Browser GUI
 
 Open `http://<unraid-ip>:18080/` in a browser (Chrome/Firefox/Edge; Safari
