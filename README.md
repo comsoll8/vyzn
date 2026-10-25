@@ -39,8 +39,9 @@ vyzn/
 
 VYZN ships as a ready-made image, `ghcr.io/comsoll8/vyzn`, so you don't need
 the source code, Node, or ffmpeg on the host. Any Linux machine, NAS or
-Unraid box with Docker works. The image is **x86-64 (amd64) only** for now
-(no ARM / Raspberry Pi / ARM Synology).
+Unraid box with Docker works. The image is published for **x86-64 (amd64)
+and 64-bit ARM (arm64)**, so it also runs on ARM Synology/QNAP models and
+Raspberry Pi 4/5 (not 32-bit ARM). Docker picks the right one itself.
 
 ### 1. Prepare two folders
 
@@ -114,6 +115,13 @@ docker run -d --name vyzn --restart unless-stopped \
   CPUs). Without it VYZN transcodes on the CPU.
 - **Tailscale remote access:** add `devices: ["/dev/net/tun:/dev/net/tun"]`
   and `cap_add: ["NET_ADMIN"]`, then connect from Settings.
+- **ARM hosts:** hardware transcoding is Intel-only, so on ARM VYZN always
+  transcodes on the CPU (the `HW_TRANSCODE` setting is ignored) using a
+  lighter x264 preset (`superfast`). ARM NAS CPUs are slow: expect 1080p
+  browser playback to be marginal and 4K/HEVC to stutter. The Android TV
+  / Google TV app plays the original file directly with no transcoding, so
+  use that where you can. Set `TRANSCODE_PRESET` (`ultrafast` ... `medium`)
+  to trade CPU for file size.
 - **Pin a version** (e.g. `ghcr.io/comsoll8/vyzn:0.11.2`) instead of
   `:latest` if you'd rather update on your own schedule.
 

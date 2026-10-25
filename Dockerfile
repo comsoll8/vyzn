@@ -9,16 +9,17 @@ FROM node:22-alpine
 # setting up its network interface.
 RUN apk add --no-cache \
     ffmpeg \
-    intel-media-driver \
-    libva-intel-driver \
-    libva-utils \
-    mesa-va-gallium \
     shadow \
     su-exec \
     tzdata \
     iptables \
     ip6tables \
-    tailscale
+    tailscale \
+ && if [ "$(uname -m)" = "x86_64" ]; then \
+      apk add --no-cache intel-media-driver libva-intel-driver libva-utils mesa-va-gallium; \
+    fi
+# (The Intel GPU drivers above only exist for x86-64. On ARM images they're
+# skipped and VYZN transcodes on the CPU.)
 
 WORKDIR /app
 

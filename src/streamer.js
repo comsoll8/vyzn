@@ -16,8 +16,20 @@ const TRANSCODE_DIR = process.env.TRANSCODE_DIR || path.join(__dirname, '..', 't
 // very next stream started, with no restart — see src/config.js. (Jobs
 // already running keep whatever mode they started with; only a new
 // startHlsJob() call picks up the change.)
+// VAAPI/QuickSync is Intel-only, so on ARM hosts (arm64 NAS boxes, Pi) the
+// setting is ignored and encoding stays on the CPU.
+const IS_ARM = process.arch === 'arm64' || process.arch === 'arm';
 function isHwTranscodeEnabled() {
+  if (IS_ARM) return false;
   return config.getBool('HW_TRANSCODE', false);
+}
+// x264 speed preset for CPU encoding. ARM CPUs are much slower than x86,
+// so default to a lighter preset there (bigger files, far less CPU);
+// TRANSCODE_PRESET overrides either default (ultrafast ... medium).
+function cpuPreset() {
+  const p = String(process.env.TRANSCODE_PRESET || '').trim().toLowerCase();
+  if (/^(ultrafast|superfast|veryfast|faster|fast|medium)$/.test(p)) return p;
+  return IS_ARM ? 'superfast' : 'veryfast';
 }
 function getVaapiDevice() {
   return config.get('VAAPI_DEVICE') || '/dev/dri/renderD128';
@@ -124,7 +136,7 @@ function startHlsJob(itemId, sourcePath, { audioTrackIndex, title } = {}) {
         .videoFilters('format=nv12,hwupload')
         .videoCodec('h264_vaapi');
     } else {
-      command.videoCodec('libx264').outputOptions(['-preset veryfast']);
+      command.videoCodec('libx264').outputOptions([`-preset ${cpuPreset()}`]);
     }
 
     const outputOptions = [
