@@ -72,6 +72,10 @@ const SCHEMA = {
     envVar: 'AUTO_SCAN_LAST_DAILY', secret: false, hidden: true,
     label: 'Last daily scan date', hint: 'internal',
   },
+  SETUP_TMDB_DISMISSED: {
+    envVar: 'SETUP_TMDB_DISMISSED', secret: false, hidden: true,
+    label: 'First-run TMDB prompt dismissed', hint: 'internal',
+  },
   TAILSCALE_AUTHKEY: {
     envVar: 'TAILSCALE_AUTHKEY', secret: true,
     label: 'Tailscale Auth Key', hint: 'One-off or reusable key from the Tailscale admin console',

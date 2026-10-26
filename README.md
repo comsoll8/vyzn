@@ -103,10 +103,13 @@ docker run -d --name vyzn --restart unless-stopped \
 
 1. Open `http://<host>:18080` and create the first account (it becomes the
    admin).
-2. Go to Control Center > Settings and add your **TMDB API key**
-   (free from themoviedb.org) for posters and descriptions. No restart
-   needed.
-3. Press **Scan** to index your library.
+2. A setup screen asks for your **TMDB key**. It's free (themoviedb.org >
+   Settings > API; the screen walks you through it), and it gives you
+   posters and descriptions. Paste it, press **Test & save**, then choose
+   **Scan my library**. You can skip it and add the key later in Control
+   Center > Settings. No restart needed. (The screen shows only to the
+   admin, never in the TV app.)
+3. If you skipped the scan, press **Scan** to index your library.
 
 ### Optional extras
 

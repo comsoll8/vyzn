@@ -522,7 +522,32 @@ async function main() {
       tmdbConcurrency: parseInt(process.env.SCAN_TMDB_CONCURRENCY || '8', 10),
       counts,
       lastScan: lastScan || null,
+      setupTmdbDismissed: config.get('SETUP_TMDB_DISMISSED') === '1',
     };
+  });
+
+  // First-run setup: checks a TMDB credential WITHOUT saving it, so the
+  // wizard can say "that key works" before storing anything. Accepts the
+  // short v3 API key or the long v4 read-access token (starts "eyJ").
+  fastify.post('/api/settings/tmdb/test', async (request, reply) => {
+    const key = String((request.body && request.body.key) || '').trim();
+    if (!key || key.length > 600 || /\s/.test(key)) {
+      reply.code(400);
+      return { ok: false, error: 'Paste the key exactly as shown on the TMDB page.' };
+    }
+    const isToken = key.startsWith('eyJ');
+    try {
+      const url = new URL('https://api.themoviedb.org/3/configuration');
+      const headers = { Accept: 'application/json' };
+      if (isToken) headers.Authorization = `Bearer ${key}`;
+      else url.searchParams.set('api_key', key);
+      const res = await fetch(url, { headers, signal: AbortSignal.timeout(10000) });
+      if (res.ok) return { ok: true, kind: isToken ? 'token' : 'key' };
+      if (res.status === 401) return { ok: false, error: 'TMDB did not accept that key. Check you copied the API Key (short) or the Read Access Token (long).' };
+      return { ok: false, error: `TMDB answered with an error (HTTP ${res.status}). Try again in a minute.` };
+    } catch {
+      return { ok: false, error: "Couldn't reach TMDB from this server. Check its internet connection." };
+    }
   });
 
   // Editable config: TMDB/Seerr/transcode values the Control Center

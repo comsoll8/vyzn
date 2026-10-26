@@ -184,6 +184,7 @@ function isPublic(p) {
 // Server-level actions only admins may perform once accounts exist.
 const ADMIN_ONLY = [
   ['GET', /^\/api\/settings\/config$/], ['PUT', /^\/api\/settings\/config$/],
+  ['POST', /^\/api\/settings\/tmdb\/test$/],
   ['*', /^\/api\/tailscale\//],
   ['*', /^\/api\/peers(\/|$)/],
   ['POST', /^\/api\/linked-servers$/], ['DELETE', /^\/api\/linked-servers\/\d+$/],

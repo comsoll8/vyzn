@@ -678,10 +678,43 @@
     </div>
   </div>
 
+  <!-- First-run setup: asks for the (free) TMDB key once, right after
+       install. See public/setup.js. -->
+  <div id="setupOverlay" class="setup-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="setupTitle">
+    <div class="setup-card">
+      <div id="setupStep1">
+        <h2 id="setupTitle">Welcome to VYZN</h2>
+        <p class="setup-lead">One quick step: VYZN uses TMDB (a free movie and TV database) for posters, descriptions and cast. It needs your own free key. It takes about two minutes.</p>
+        <ol class="setup-steps">
+          <li>Open <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer">themoviedb.org/settings/api</a> and sign in (or create a free account).</li>
+          <li>Request an API key. Choose <b>Developer</b>, and for the use say personal, non-commercial.</li>
+          <li>Copy the <b>API Key</b> (short) and paste it below. The long <b>Read Access Token</b> works too.</li>
+        </ol>
+        <label class="setup-label" for="setupKey">TMDB key</label>
+        <input id="setupKey" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key here" />
+        <p id="setupMsg" class="setup-msg" role="status"></p>
+        <div class="setup-actions">
+          <button id="setupSave" type="button" class="btn-primary">Test &amp; save</button>
+          <button id="setupSkip" type="button" class="btn-secondary">Skip for now</button>
+        </div>
+        <p class="setup-foot">You can add or change it later in Control Center &gt; Settings. Without it VYZN still plays your files, just without posters and descriptions.</p>
+      </div>
+      <div id="setupStep2" class="hidden">
+        <h2>Key saved</h2>
+        <p class="setup-lead">TMDB is connected. Scan your library now to fetch posters and details?</p>
+        <div class="setup-actions">
+          <button id="setupScan" type="button" class="btn-primary">Scan my library</button>
+          <button id="setupLater" type="button" class="btn-secondary">Later</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
   <script src="/auth.js"></script>
   <script src="/admin.js"></script>
   <script src="/app.js"></script>
   <script src="/nowplaying.js"></script>
+  <script src="/setup.js"></script>
 </body>
 </html>

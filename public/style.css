@@ -2844,3 +2844,28 @@ body.has-nowplaying .server-banner { bottom: 120px; }
   .np-controls { gap: 2px; }
   .np-btn { width: 32px; height: 32px; }
 }
+
+/* --- First-run TMDB setup wizard (public/setup.js) --- */
+.setup-overlay {
+  position: fixed; inset: 0; z-index: 3500; display: flex; align-items: center; justify-content: center;
+  padding: 16px; background: rgba(4, 6, 10, 0.82); backdrop-filter: blur(10px);
+}
+.setup-overlay.hidden, .setup-card .hidden { display: none; }
+.setup-card {
+  width: min(560px, 100%); max-height: 100%; overflow: auto; padding: 28px;
+  border-radius: 18px; background: #0d1219; border: 1px solid rgba(255,255,255,.1);
+  box-shadow: 0 24px 80px rgba(0,0,0,.6);
+}
+.setup-card h2 { margin: 0 0 10px; font-size: 1.5rem; }
+.setup-lead { margin: 0 0 14px; opacity: .85; line-height: 1.5; }
+.setup-steps { margin: 0 0 16px; padding-left: 20px; line-height: 1.6; opacity: .92; }
+.setup-steps a { color: var(--accent); }
+.setup-label { display: block; margin-bottom: 6px; font-size: .85rem; opacity: .75; }
+.setup-card input { width: 100%; box-sizing: border-box; padding: 12px 14px; border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.06); color: inherit; font-size: 1rem; }
+.setup-card input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.setup-msg { min-height: 1.3em; margin: 8px 0 0; font-size: .9rem; }
+.setup-msg.err { color: #ff8a8a; }
+.setup-msg.ok { color: #7dffb0; }
+.setup-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.setup-foot { margin: 16px 0 0; font-size: .8rem; opacity: .6; line-height: 1.5; }
