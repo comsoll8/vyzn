@@ -291,6 +291,9 @@ const expectedColumns = {
   backdrop_url: 'TEXT',
   overview: 'TEXT',
   release_year: 'INTEGER',
+  // Full 'YYYY-MM-DD' TMDB release date (movies only), for the Home page's
+  // "On This Day" anniversaries. '' = looked up, TMDB has none.
+  release_date: 'TEXT',
   rating: 'REAL',
   tmdb_id: 'INTEGER',
   tmdb_matched_title: 'TEXT',

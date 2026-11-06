@@ -978,6 +978,19 @@ function posterCard(item) {
   return card;
 }
 
+// A normal poster card with a one-line "why today" caption under it.
+function onThisDayCard(item) {
+  const card = posterCard(item);
+  if (item.otd_reason) {
+    card.classList.add('otd-card');
+    const reason = document.createElement('p');
+    reason.className = 'otd-reason';
+    reason.textContent = item.otd_reason;
+    card.appendChild(reason);
+  }
+  return card;
+}
+
 function renderShelf(container, title, items, cardBuilder, anchorId) {
   if (!items || items.length === 0) return;
   const build = cardBuilder || posterCard;
@@ -1073,14 +1086,21 @@ async function renderHome() {
   // Recommendations and trending are about this server's own history, so a
   // linked server only gets Continue Watching (kept here), New and genres.
   const own = profileId && !isRemote();
-  const [continueWatching, recommendations, trending, fresh] = await Promise.all([
+  const [continueWatching, recommendations, trending, fresh, onThisDay] = await Promise.all([
     profileId ? fetchJson(`/api/profiles/${profileId}/continue-watching`) : [],
     own ? fetchJson(`/api/profiles/${profileId}/recommendations`) : [],
     own ? fetchJson(`/api/profiles/${profileId}/trending`) : [],
     profileId ? fetchJson(`/api/profiles/${profileId}/new`).catch(() => null) : null,
+    own ? fetchJson(`/api/profiles/${profileId}/on-this-day`).catch(() => []) : [],
   ]);
+  const todaysPicks = Array.isArray(onThisDay) ? onThisDay : [];
 
+  // A film tied to today's exact date (not just a season or anniversary)
+  // gets the hero when there's nothing to resume — V for Vendetta on 5 Nov.
+  const datedPick = todaysPicks.find((i) => i.backdrop_url && i.otd_reason &&
+    !/^Released /.test(i.otd_reason));
   const heroSource = (continueWatching[0]) ||
+    datedPick ||
     (trending.length ? trending[Math.floor(Math.random() * Math.min(trending.length, 10))] : null) ||
     state.items.find((i) => i.backdrop_url);
   heroDefaultItem = heroSource;
@@ -1088,6 +1108,8 @@ async function renderHome() {
   setHero(heroSource, heroDefaultKind);
 
   renderShelf(rowsEl, 'Continue Watching', continueWatching);
+  // Pinned (not shuffled with the rest) — it's only relevant today.
+  renderShelf(rowsEl, 'On This Day', todaysPicks, onThisDayCard);
 
   // Every other row — each "Because you watched X", Trending, and every
   // genre shelf — goes into one flat list of descriptors that then gets

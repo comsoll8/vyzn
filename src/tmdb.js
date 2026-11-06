@@ -260,6 +260,7 @@ async function lookupMovie(rawTitle) {
     matchedTitle: best.title,
     overview: best.overview || null,
     releaseYear: best.release_date ? parseInt(best.release_date.slice(0, 4), 10) : null,
+    releaseDate: best.release_date || null,
     rating: typeof best.vote_average === 'number' ? best.vote_average : null,
     posterUrl: best.poster_path ? `${IMAGE_BASE}/w500${best.poster_path}` : null,
     backdropUrl: best.backdrop_path ? `${IMAGE_BASE}/w1280${best.backdrop_path}` : null,
@@ -325,6 +326,16 @@ async function getMovieGenres(tmdbId) {
   } catch (err) {
     return [];
   }
+}
+
+/**
+ * A movie's primary release date ('YYYY-MM-DD'), or '' when TMDB has none.
+ * Used to backfill release_date for films matched before that column
+ * existed. Throws on network/API errors so the caller can retry later.
+ */
+async function getMovieReleaseDate(tmdbId) {
+  const data = await tmdbFetch(`/movie/${tmdbId}`);
+  return data.release_date || '';
 }
 
 /**
@@ -560,6 +571,7 @@ module.exports = {
   getMovieGenreMap,
   getTvGenreMap,
   getMovieGenres,
+  getMovieReleaseDate,
   getTvGenres,
   getMovieCredits,
   getShowCredits,

@@ -49,6 +49,7 @@ const fastify = require('fastify')({
 
 const db = require('./db');
 const { runScan, enrichUnmatched, backfillGenres, scanEvents, linkMediaGenres } = require('./scanner');
+const onThisDay = require('./onthisday');
 const { chooseDefaultAudio, startHlsJob, listActiveJobs, stopJob, extractSubtitlesIfNeeded, startTranscodeCleanup } = require('./streamer');
 const tmdb = require('./tmdb');
 const ratings = require('./ratings');
@@ -875,10 +876,11 @@ async function main() {
       UPDATE media_items SET
         tmdb_id = @tmdbId, tmdb_matched_title = @matchedTitle, poster_url = @posterUrl,
         backdrop_url = @backdropUrl, overview = @overview, release_year = @releaseYear,
+        release_date = COALESCE(@releaseDate, release_date),
         rating = @rating, media_type = @mediaType, content_rating = @contentRating,
         updated_at = datetime('now')
       WHERE id = @id
-    `).run({ id: item.id, ...match });
+    `).run({ id: item.id, releaseDate: null, ...match });
 
     // Only a movie rematch carries genres directly on `match` — a TV
     // episode's genres live on its show, which this per-episode override
@@ -1290,6 +1292,15 @@ async function main() {
     };
   };
   fastify.get('/api/profiles/:profileId/new', async (request) => buildNew(Number(request.params.profileId)));
+
+  // "On This Day": films tied to today's date (see src/onthisday.js) —
+  // curated dates and seasons first, then release anniversaries. Empty
+  // most days for a small library, which just hides the shelf.
+  fastify.get('/api/profiles/:profileId/on-this-day', async (request) => {
+    const profileId = Number(request.params.profileId);
+    const rows = onThisDay.buildOnThisDay(profileId);
+    return dedupeMovies(filterByProfile(rows, profileId)).slice(0, 20);
+  });
   // Same shelves without a profile — what a linked server (peer) sees.
   fastify.get('/api/peer/new', async () => buildNew(null));
 
@@ -1824,6 +1835,8 @@ async function main() {
   fastify.log.info(`Media server listening on port ${PORT}, serving ${MEDIA_DIR}`);
   startTranscodeCleanup();
   autoscan.start(fastify.log);
+  onThisDay.backfillReleaseDates(fastify.log)
+    .catch((err) => fastify.log.error(err, 'release-date backfill failed'));
 }
 
 main().catch((err) => {
