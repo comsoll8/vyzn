@@ -3083,3 +3083,46 @@ body.has-nowplaying .server-banner { bottom: 120px; }
   font-weight: 600;
 }
 .tv-app .see-all-pill:focus { outline: 3px solid #fff; outline-offset: 3px; }
+
+/* ==========================================================================
+   Phone, portrait (the TV APK installed on an Android phone)
+   Same look as the TV layout, re-proportioned for a tall, narrow screen:
+   logo + icons on one row, tabs below, title block, then big posters.
+   Landscape phones keep the TV layout above.
+   ========================================================================== */
+@media (orientation: portrait) and (max-width: 700px) {
+  .tv-app { --tv-inset: 5vw; --card-radius: 2.4vw; }
+  .tv-app .topbar { min-height: 15vh; }
+  .tv-app .topbar-logo { left: 5vw; top: 2.4vh; height: 9vw; }
+  .tv-app .tv-clock { display: none; }
+  .tv-app .top-tabs { left: 5vw; top: 8.6vh; gap: 1vw; }
+  .tv-app .tab-btn { font-size: 3.7vw; padding: 0.7vh 3.6vw; }
+  .tv-app #controlCenterBtn,
+  .tv-app #searchWrap,
+  .tv-app #appSwitcherBtn { left: auto; top: 2.4vh; }
+  .tv-app #controlCenterBtn { right: 5vw; width: 9vw; height: 9vw; }
+  .tv-app #activeProfileName::first-letter { font-size: 4.2vw; }
+  .tv-app #searchWrap { right: 16vw; }
+  .tv-app #searchBtn { width: 9vw; height: 9vw; }
+  .tv-app #appSwitcherBtn { right: 27vw; width: 9vw; height: 9vw; font-size: 4.4vw; }
+  .tv-app #genreFilterBtn { right: 5vw; top: 8.8vh; }
+
+  .tv-app .hero-content { padding: 20vh 5vw 0; max-width: 100vw; }
+  .tv-app .hero-content h2 { font-size: 8.4vw; max-width: 90vw; }
+  .tv-app .hero-meta { gap: 3vw; margin: 1.2vh 0 1.2vh; font-size: 3.6vw; }
+  .tv-app #heroRating { border-radius: 1vw; padding: 0 1.6vw; font-size: 3vw; }
+  .tv-app .hero-content p { font-size: 3.7vw; max-width: 90vw; -webkit-line-clamp: 3; }
+  .tv-app .hero-scrim {
+    background:
+      linear-gradient(90deg, rgba(8,6,6,0.7) 0%, rgba(8,6,6,0.25) 70%, rgba(8,6,6,0.05) 100%),
+      linear-gradient(180deg, rgba(8,6,6,0.35) 0%, rgba(8,6,6,0) 22%, rgba(8,6,6,0.5) 50%, rgba(8,6,6,0.85) 100%);
+  }
+
+  .tv-app .rows { margin-top: calc(48vh - var(--nav-height)); height: 52vh; }
+  .tv-app .shelf h3 { font-size: 5vw; margin-bottom: 0.8vh; }
+  .tv-app .shelf-server { font-size: 3.5vw; }
+  .tv-app .shelf-track { gap: 2.6vw; padding-right: 8vw; }
+  .tv-app .shelf-track .card { flex: 0 0 31vw; width: 31vw; }
+  .tv-app .grid { grid-template-columns: repeat(auto-fill, minmax(30vw, 1fr)); gap: 2.6vw; }
+  .tv-app .see-all-pill { font-size: 3.5vw; padding: 1vh 4vw; margin-left: 1vw; }
+}
