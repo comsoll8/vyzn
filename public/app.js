@@ -999,9 +999,33 @@ function renderShelf(container, title, items, cardBuilder, anchorId) {
   if (anchorId) section.id = anchorId;
   const heading = document.createElement('h3');
   heading.textContent = title;
+  // Browsing a linked server: say whose shelf this is, like "Recently
+  // Added Movies · Cupcake".
+  if (isRemote() && state.server && state.server.name) {
+    const where = document.createElement('span');
+    where.className = 'shelf-server';
+    where.textContent = ' · ' + state.server.name;
+    heading.appendChild(where);
+  }
   const track = document.createElement('div');
   track.className = 'shelf-track';
   for (const item of items) track.appendChild(build(item));
+  // TV layout: a "See all" pill closes each row and opens the full
+  // Movies / TV Shows grid (for a genre shelf, filtered to that genre).
+  if (document.documentElement.classList.contains('tv-app') && container === rowsEl) {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'see-all-pill';
+    more.textContent = 'See all';
+    more.addEventListener('click', async () => {
+      const tabName = /tv show/i.test(title) ? 'tv' : 'movies';
+      const tabBtn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+      if (tabBtn) tabBtn.click();
+      const m = /^genre-shelf-(\d+)$/.exec(anchorId || '');
+      if (m) await setGenreFilter(Number(m[1]));
+    });
+    track.appendChild(more);
+  }
   section.appendChild(heading);
   section.appendChild(track);
   container.appendChild(section);
@@ -4431,3 +4455,13 @@ window.VyznAuth.ready.then(() => {
   connectScanProgress();
   initProfiles();
 });
+
+
+// --- TV layout clock (top right; shown by .tv-app CSS only) -----------------
+(function () {
+  const el = document.getElementById('tvClock');
+  if (!el) return;
+  const tick = () => { el.textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
+  tick();
+  setInterval(tick, 20000);
+})();

@@ -2884,3 +2884,202 @@ body.has-nowplaying .server-banner { bottom: 120px; }
   overflow: hidden;
 }
 .tv-app .otd-reason { font-size: 11px; }
+
+/* ==========================================================================
+   TV home layout (Android TV / Google TV app only)
+   Proportions follow a reference TV UI: a full-screen artwork backdrop,
+   outlined-pill tabs top-left, a slim icon rail at the left, a large title
+   block in the upper half, then one row of big posters with the next row's
+   title peeking in at the bottom edge. Everything is sized in vw/vh so the
+   layout looks the same at 720p, 1080p and 4K. Scoped to .tv-app, so
+   desktop/phone layouts are untouched.
+   ========================================================================== */
+.tv-app {
+  --tv-inset: 8.4vw;           /* left edge shared by tabs, title block and shelf titles */
+  --card-radius: 0.9vw;
+}
+
+/* --- Backdrop fills the whole screen; text and rows sit on top of it ----- */
+.tv-app .hero {
+  height: 100vh;
+  align-items: flex-start;
+}
+.tv-app .hero-backdrop { background-position: center 15%; transform: none; }
+.tv-app .hero-scrim {
+  background:
+    linear-gradient(90deg, rgba(8,6,6,0.82) 0%, rgba(8,6,6,0.55) 30%, rgba(8,6,6,0.06) 64%),
+    linear-gradient(180deg, rgba(8,6,6,0.30) 0%, rgba(8,6,6,0) 28%, rgba(8,6,6,0.42) 58%, rgba(8,6,6,0.78) 100%);
+}
+.tv-app .hero-content {
+  padding: 17vh 0 0 var(--tv-inset);
+  max-width: 52vw;
+}
+.tv-app .hero-content h2 {
+  font-size: 4.2vw;
+  line-height: 1.06;
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 0;
+  max-width: 44vw;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tv-app .hero-meta {
+  gap: 1.5vw;
+  margin: 1.8vh 0 1.6vh;
+  font-size: 1.45vw;
+}
+.tv-app .hero-meta > span:not(:empty) {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-weight: 500;
+  color: #fff;
+}
+.tv-app #heroRating {
+  order: 3;
+  border: 1.5px solid rgba(255,255,255,0.75);
+  border-radius: 0.4vw;
+  padding: 0 0.6vw;
+  font-size: 1.2vw;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.tv-app .hero-content p {
+  font-size: 1.5vw;
+  line-height: 1.45;
+  font-weight: 500;
+  color: rgba(255,255,255,0.92);
+  max-width: 44vw;
+  margin: 0;
+  -webkit-line-clamp: 2;
+}
+
+/* --- Top-left tabs: active = outlined pill, others plain text ------------ */
+.tv-app .topbar {
+  min-height: 15vh;
+  padding: 0;
+  gap: 0;
+}
+.tv-app .top-tabs {
+  position: absolute;
+  left: var(--tv-inset);
+  top: 6.4vh;
+  margin: 0;
+  gap: 0.6vw;
+  flex-wrap: nowrap;
+}
+.tv-app .tab-btn {
+  background: transparent;
+  border: 2px solid transparent;
+  color: rgba(255,255,255,0.82);
+  font-size: 1.45vw;
+  font-weight: 600;
+  padding: 0.7vh 1.6vw;
+}
+.tv-app .tab-btn.active {
+  background: transparent;
+  color: #fff;
+  border-color: #fff;
+}
+.tv-app .topbar-logo {
+  position: absolute;
+  left: 2.6vw;
+  top: 6.8vh;
+  height: 3.3vw;
+}
+.tv-clock { display: none; }
+.tv-app .tv-clock {
+  display: block;
+  position: absolute;
+  right: 4vw;
+  top: 7.6vh;
+  font-size: 1.4vw;
+  color: rgba(255,255,255,0.78);
+}
+
+/* --- Left icon rail: profile, search, active streams ---------------------- */
+.tv-app #controlCenterBtn,
+.tv-app #searchWrap,
+.tv-app #appSwitcherBtn {
+  position: absolute;
+  left: 2.6vw;
+  margin: 0;
+}
+.tv-app #controlCenterBtn {
+  top: 43vh;
+  width: 3.3vw; height: 3.3vw;
+  padding: 0;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: #f08a4b;
+  color: #121212;
+  border: none;
+}
+.tv-app #activeProfileName { display: block; font-size: 0; line-height: 1; }
+.tv-app #activeProfileName::first-letter { font-size: 1.6vw; font-weight: 700; }
+.tv-app #searchWrap { top: 50vh; }
+.tv-app #searchBtn { width: 3.3vw; height: 3.3vw; background: transparent; }
+.tv-app #appSwitcherBtn {
+  top: 57vh;
+  width: 3.3vw; height: 3.3vw;
+  background: transparent;
+  border-radius: 50%;
+  font-size: 1.7vw;
+}
+.tv-app #genreFilterBtn { position: absolute; right: 12vw; top: 7vh; }
+
+/* --- Rows: start at about the screen's midpoint, next row peeks in ------- */
+.tv-app .rows {
+  position: relative;
+  z-index: 2;
+  margin-top: calc(53vh - var(--nav-height));
+  height: 47vh;
+  min-height: 0;
+  padding: 0 0 4vh;
+}
+.tv-app .shelf {
+  min-height: 0;
+  display: block;
+  margin-bottom: 1vh;
+}
+.tv-app .shelf h3 {
+  font-size: 1.85vw;
+  font-weight: 700;
+  margin: 0 0 1.2vh;
+  padding: 0 0 0 var(--tv-inset);
+}
+.tv-app .shelf-server {
+  font-size: 1.35vw;
+  font-weight: 500;
+  color: rgba(255,255,255,0.62);
+}
+.tv-app .shelf-track {
+  gap: 1.4vw;
+  padding: 0.8vh 6vw 1.6vh var(--tv-inset);
+  align-items: center;
+}
+.tv-app .shelf-track .card {
+  flex: 0 0 13.7vw;
+  width: 13.7vw;
+}
+.tv-app .grid {
+  grid-template-columns: repeat(auto-fill, minmax(13.7vw, 1fr));
+  gap: 1.4vw;
+}
+.see-all-pill { display: none; }
+.tv-app .see-all-pill {
+  display: block;
+  flex: 0 0 auto;
+  margin-left: 0.6vw;
+  background: rgba(255,255,255,0.92);
+  color: #121212;
+  border: none;
+  border-radius: 999px;
+  padding: 1.1vh 1.7vw;
+  font-size: 1.4vw;
+  font-weight: 600;
+}
+.tv-app .see-all-pill:focus { outline: 3px solid #fff; outline-offset: 3px; }
