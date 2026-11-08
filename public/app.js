@@ -735,10 +735,22 @@ function renderProfileList(profiles) {
   }
 }
 
+// Top-bar profile button. Desktop/phone browsers show the profile's name;
+// the TV app shows the profile's chosen avatar as a round badge (falling
+// back to the first letter when no avatar is set).
+function paintActiveProfile(profile) {
+  if (!profile) return;
+  const useImg = document.documentElement.classList.contains('tv-app') && hasAvatarImg(profile);
+  controlCenterBtn.classList.toggle('has-img', useImg);
+  controlCenterBtn.setAttribute('aria-label', profile.name);
+  if (useImg) activeProfileNameEl.innerHTML = avatarInner(profile);
+  else activeProfileNameEl.textContent = profile.name;
+}
+
 function selectProfile(profile) {
   state.profile = profile;
   localStorage.setItem(PROFILE_KEY, String(profile.id));
-  activeProfileNameEl.textContent = profile.name;
+  paintActiveProfile(profile);
   profileGateEl.classList.add('hidden');
   appEl.classList.remove('hidden');
   loadLibrary();
@@ -781,7 +793,7 @@ document.getElementById('ccChangeAvatarBtn').addEventListener('click', () => {
     const res = await fetch('/api/profiles/' + p.id, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ avatar: id }),
     });
-    if (res.ok) { state.profile = await res.json(); await renderCcProfiles(); }
+    if (res.ok) { state.profile = await res.json(); paintActiveProfile(state.profile); await renderCcProfiles(); }
   });
 });
 
@@ -3317,7 +3329,7 @@ async function renderCcProfiles() {
 async function switchProfileInstant(profile) {
   state.profile = profile;
   localStorage.setItem(PROFILE_KEY, String(profile.id));
-  activeProfileNameEl.textContent = profile.name;
+  paintActiveProfile(profile);
   await renderCcProfiles();
   await loadLibrary();
 }
@@ -4100,7 +4112,7 @@ function settingsProfileRow(profile) {
         state.profile.name = nameInput.value.trim() || profile.name;
         state.profile.is_child = childCheck.checked;
         state.profile.max_content_rating = ratingSelect.value || null;
-        activeProfileNameEl.textContent = state.profile.name;
+        paintActiveProfile(state.profile);
       }
     } catch (err) {
       saveBtn.textContent = 'Failed';

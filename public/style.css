@@ -3262,3 +3262,15 @@ body.has-nowplaying .server-banner { bottom: 120px; }
 @media (orientation: portrait) and (max-width: 700px) {
   .tv-app .otd-card .otd-reason { font-size: 2.8vw; padding: 3vh 2vw 1vh; }
 }
+
+/* TV: the profile badge shows the chosen avatar (round, no orange fill), and
+   the shelves scroll without a visible scrollbar. */
+.tv-app #controlCenterBtn.has-img { background: transparent; overflow: hidden; }
+.tv-app #controlCenterBtn.has-img #activeProfileName { font-size: inherit; width: 100%; height: 100%; display: block; }
+.tv-app #controlCenterBtn.has-img .avatar-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.tv-app .shelf-track,
+.tv-app .rows,
+.tv-app .movie-detail-overlay { scrollbar-width: none; -ms-overflow-style: none; }
+.tv-app .shelf-track::-webkit-scrollbar,
+.tv-app .rows::-webkit-scrollbar,
+.tv-app .movie-detail-overlay::-webkit-scrollbar { display: none; width: 0; height: 0; }
