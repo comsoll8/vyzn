@@ -485,10 +485,22 @@ function focusInDirection(direction) {
 
   const current = document.activeElement;
   const currentInRoot = current && root.contains(current) && current !== document.body;
+  const isTv = document.documentElement.classList.contains('tv-app');
   if (!currentInRoot) {
-    candidates[0].focus();
+    // TV: the first Down press should land on the content (first poster),
+    // not on the top bar or the left rail — Left reaches the rail.
+    const firstCard = isTv && direction === 'down' ? candidates.find((el) => el.matches('.shelf-track .card, .grid .card')) : null;
+    (firstCard || candidates[0]).focus();
+    if (firstCard) bringIntoViewManually(firstCard);
     return;
   }
+
+  // TV: the left rail (profile / search / streams) is only entered with
+  // Left, so Up/Down from anywhere else must never snap to it.
+  const RAIL_SEL = '#controlCenterBtn, #searchWrap, #searchWrap *, #appSwitcherBtn';
+  const inRail = isTv && current.matches(RAIL_SEL);
+  const skipRail = isTv && !inRail && (direction === 'up' || direction === 'down');
+  const railOnly = inRail && (direction === 'up' || direction === 'down');
 
   const currentRect = current.getBoundingClientRect();
   const cx = currentRect.left + currentRect.width / 2;
@@ -498,6 +510,8 @@ function focusInDirection(direction) {
   let bestScore = Infinity;
   for (const el of candidates) {
     if (el === current) continue;
+    if (skipRail && el.matches(RAIL_SEL)) continue;
+    if (railOnly && !el.matches(RAIL_SEL)) continue;
     const rect = el.getBoundingClientRect();
     const dx = (rect.left + rect.width / 2) - cx;
     const dy = (rect.top + rect.height / 2) - cy;
